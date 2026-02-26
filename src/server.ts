@@ -22,4 +22,5 @@ const startServer = async () => {
   }
 };
 
+console.log("First log123");
 startServer();
