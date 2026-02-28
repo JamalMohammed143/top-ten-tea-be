@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getTracking = exports.getAssignments = exports.createAssignment = exports.deleteUser = exports.updateUser = exports.getUsers = exports.createUser = exports.deleteProduct = exports.updateProduct = exports.getProducts = exports.createProduct = void 0;
 const Product_1 = require("../models/Product");
-const User_1 = require("../models/User");
+const Users_1 = require("../models/Users");
 const Assignment_1 = require("../models/Assignment");
 const Sale_1 = require("../models/Sale");
 const AppError_1 = require("../utils/AppError");
@@ -72,7 +72,7 @@ exports.deleteProduct = deleteProduct;
 const createUser = async (req, res, next) => {
     try {
         // Password will be hashed in pre-save hook
-        const user = await User_1.User.create(req.body);
+        const user = await Users_1.User.create(req.body);
         // Remove password from response
         user.password = undefined;
         res.status(201).json({ success: true, data: user });
@@ -84,7 +84,7 @@ const createUser = async (req, res, next) => {
 exports.createUser = createUser;
 const getUsers = async (req, res, next) => {
     try {
-        const users = await User_1.User.find({ _id: { $ne: req.user?._id } });
+        const users = await Users_1.User.find({ _id: { $ne: req.user?._id } });
         res.status(200).json({ success: true, data: users });
     }
     catch (error) {
@@ -96,7 +96,7 @@ const updateUser = async (req, res, next) => {
     try {
         if (req.body.password) {
             // If updating password, we must save to trigger pre-save hook
-            const user = await User_1.User.findById(req.params.id);
+            const user = await Users_1.User.findById(req.params.id);
             if (!user)
                 return next(new AppError_1.AppError("User not found", 404));
             Object.assign(user, req.body);
@@ -104,7 +104,7 @@ const updateUser = async (req, res, next) => {
             user.password = undefined;
             return res.status(200).json({ success: true, data: user });
         }
-        const user = await User_1.User.findByIdAndUpdate(req.params.id, req.body, {
+        const user = await Users_1.User.findByIdAndUpdate(req.params.id, req.body, {
             new: true,
             runValidators: true,
         });
@@ -119,7 +119,7 @@ const updateUser = async (req, res, next) => {
 exports.updateUser = updateUser;
 const deleteUser = async (req, res, next) => {
     try {
-        const user = await User_1.User.findByIdAndDelete(req.params.id);
+        const user = await Users_1.User.findByIdAndDelete(req.params.id);
         if (!user)
             return next(new AppError_1.AppError("User not found", 404));
         res.status(200).json({ success: true, data: {} });
@@ -136,7 +136,7 @@ const createAssignment = async (req, res, next) => {
     try {
         const { deliveryPersonId, productId, assignedQuantity } = req.body;
         // Validate delivery person
-        const dp = await User_1.User.findOne({ _id: deliveryPersonId, role: "delivery" });
+        const dp = await Users_1.User.findOne({ _id: deliveryPersonId, role: "delivery" });
         if (!dp)
             return next(new AppError_1.AppError("Invalid delivery person", 400));
         // Validate product

@@ -9,8 +9,10 @@ const db_1 = require("./config/db");
 dotenv_1.default.config();
 const PORT = process.env.PORT || 5000;
 const startServer = async () => {
+    console.log("PORT", PORT);
     try {
         await (0, db_1.connectDB)();
+        console.log("MONGO_URI:", process.env.MONGO_URI);
         app_1.default.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
         });
@@ -20,4 +22,5 @@ const startServer = async () => {
         process.exit(1);
     }
 };
+console.log("First log123");
 startServer();

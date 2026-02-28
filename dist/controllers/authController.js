@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.login = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const User_1 = require("../models/User");
+const Users_1 = require("../models/Users");
 const AppError_1 = require("../utils/AppError");
 // Generate Token
 const generateToken = (id, role) => {
@@ -20,7 +20,8 @@ const login = async (req, res, next) => {
             return next(new AppError_1.AppError("Please provide an email and password", 400));
         }
         // Role is NOT accepted from frontend, pulled from database
-        const user = await User_1.User.findOne({ email }).select("+password");
+        const user = await Users_1.User.findOne({ email }).select("+password");
+        console.log(user, "user");
         if (!user) {
             return next(new AppError_1.AppError("Invalid credentials", 401));
         }

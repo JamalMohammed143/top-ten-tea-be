@@ -7,18 +7,19 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
 const morgan_1 = __importDefault(require("morgan"));
-const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
+// import rateLimit from "express-rate-limit";
 const errorHandler_1 = require("./middlewares/errorHandler");
 const app = (0, express_1.default)();
 // Security Middleware
 app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)());
 // Rate Limiting
-const limiter = (0, express_rate_limit_1.default)({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
-});
-app.use(limiter);
+// const limiter = rateLimit({
+//   windowMs: 15 * 60 * 1000, // 15 minutes
+//   max: 100, // limit each IP to 100 requests per windowMs
+// });
+// app.use(limiter);
+// app.set("trust proxy", false);
 // Body Parser & Logging
 app.use(express_1.default.json());
 app.use((0, morgan_1.default)("dev"));
