@@ -16,11 +16,12 @@ export const createProduct = async (
   next: NextFunction,
 ) => {
   try {
-    const { name, price, commissionPercentage } = req.body;
+    const { name, productCode, price, netQuantity } = req.body;
     const product = await Product.create({
       name,
+      productCode,
       price,
-      commissionPercentage,
+      netQuantity,
       createdBy: req.user?._id,
     });
     res.status(201).json({ success: true, data: product });

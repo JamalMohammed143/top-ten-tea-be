@@ -52,7 +52,7 @@ export const createSale = async (
 
     const totalAmount = quantitySold * amountPerProduct;
     // Commission Logic: commissionEarned = (quantitySold * amountPerProduct * commissionPercentage) / 100
-    const commissionEarned = (totalAmount * product.commissionPercentage) / 100;
+    const commissionEarned = (totalAmount * 10) / 100;
 
     // Reduce assigned quantity
     assignment.assignedQuantity -= quantitySold;
