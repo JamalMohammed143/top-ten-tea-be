@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { User, IUser } from "../models/Users";
+import { User, IUser } from "../models/User";
 import { AppError } from "../utils/AppError";
 
 // Extend Express Request to include user

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { Product } from "../models/Product";
-import { User } from "../models/Users";
+import { User } from "../models/User";
 import { Assignment } from "../models/Assignment";
 import { Sale } from "../models/Sale";
 import { AppError } from "../utils/AppError";
