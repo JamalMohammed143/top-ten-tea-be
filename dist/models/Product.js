@@ -37,8 +37,9 @@ exports.Product = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 const ProductSchema = new mongoose_1.Schema({
     name: { type: String, required: true },
+    productCode: { type: String, required: true, unique: true },
     price: { type: Number, required: true },
-    commissionPercentage: { type: Number, required: true }, // Commission for selling this product
+    netQuantity: { type: Number, required: true, default: 0 },
     createdBy: {
         type: mongoose_1.default.Schema.Types.ObjectId,
         ref: "User",
