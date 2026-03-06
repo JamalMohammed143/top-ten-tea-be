@@ -5,7 +5,7 @@ export interface ISale extends Document {
   productId: mongoose.Types.ObjectId;
   quantitySold: number;
   amountPerProduct: number;
-  storeName: string;
+  storeId: mongoose.Types.ObjectId;
   totalAmount: number;
   commissionEarned: number;
   createdAt: Date;
@@ -25,7 +25,11 @@ const SaleSchema: Schema = new Schema(
     },
     quantitySold: { type: Number, required: true },
     amountPerProduct: { type: Number, required: true },
-    storeName: { type: String, required: true },
+    storeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Store",
+      required: true,
+    },
     totalAmount: { type: Number, required: true },
     commissionEarned: { type: Number, required: true },
   },

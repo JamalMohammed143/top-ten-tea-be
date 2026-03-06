@@ -12,7 +12,9 @@ export const getAssignedProducts = async (
   try {
     const assignments = await Assignment.find({
       deliveryPersonId: req.user?._id,
-    }).populate("productId", "name price commissionPercentage");
+    })
+      .populate("productId", "name price commissionPercentage")
+      .populate("storeId", "name storeId");
 
     res.status(200).json({ success: true, data: assignments });
   } catch (error) {
@@ -26,11 +28,11 @@ export const createSale = async (
   next: NextFunction,
 ) => {
   try {
-    const { productId, quantitySold, amountPerProduct, storeName } = req.body;
+    const { productId, quantity, amount, storeId } = req.body;
     const deliveryPersonId = req.user?._id;
 
     // Validate assignment
-    const assignment = await Assignment.findOne({
+    /* const assignment = await Assignment.findOne({
       deliveryPersonId,
       productId,
     });
@@ -42,7 +44,7 @@ export const createSale = async (
 
     if (assignment.assignedQuantity < quantitySold) {
       return next(new AppError("Not enough assigned quantity to sell", 400));
-    }
+    } */
 
     // Get product to calculate commission
     const product = await Product.findById(productId);
@@ -50,21 +52,23 @@ export const createSale = async (
       return next(new AppError("Product not found", 404));
     }
 
-    const totalAmount = quantitySold * amountPerProduct;
+    const quantitySold = quantity;
+    // const totalAmount = quantitySold * amountPerProduct;
+    const totalAmount = amount;
     // Commission Logic: commissionEarned = (quantitySold * amountPerProduct * commissionPercentage) / 100
-    const commissionEarned = (totalAmount * 10) / 100;
+    const commissionEarned = (amount * 10) / 100;
 
     // Reduce assigned quantity
-    assignment.assignedQuantity -= quantitySold;
-    await assignment.save();
+    // assignment.assignedQuantity -= quantitySold;
+    // await assignment.save();
 
     // Create Sale record
     const sale = await Sale.create({
       deliveryPersonId,
       productId,
       quantitySold,
-      amountPerProduct,
-      storeName,
+      amountPerProduct: product.price,
+      storeId,
       totalAmount,
       commissionEarned,
     });
@@ -81,10 +85,9 @@ export const getMySales = async (
   next: NextFunction,
 ) => {
   try {
-    const sales = await Sale.find({ deliveryPersonId: req.user?._id }).populate(
-      "productId",
-      "name",
-    );
+    const sales = await Sale.find({ deliveryPersonId: req.user?._id })
+      .populate("productId", "name")
+      .populate("storeId", "name");
 
     // Calculate totals
     const totals = sales.reduce(

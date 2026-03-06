@@ -13,6 +13,6 @@ router.use(authorize("delivery"));
 
 router.get("/assigned-products", getAssignedProducts);
 router.post("/sales", createSale);
-router.get("/sales/my", getMySales);
+router.get("/sales", getMySales);
 
 export default router;
