@@ -3,6 +3,7 @@ import { Product } from "../models/Product";
 import { User } from "../models/User";
 import { Assignment } from "../models/Assignment";
 import { Sale } from "../models/Sale";
+import { Store } from "../models/Store";
 import { AppError } from "../utils/AppError";
 import mongoose from "mongoose";
 
@@ -159,23 +160,44 @@ export const createAssignment = async (
   next: NextFunction,
 ) => {
   try {
-    const { deliveryPersonId, productId, assignedQuantity } = req.body;
+    const { userId, assignments } = req.body;
+
+    if (!userId || !Array.isArray(assignments) || assignments.length === 0) {
+      return next(new AppError("Invalid request data", 400));
+    }
 
     // Validate delivery person
-    const dp = await User.findOne({ _id: deliveryPersonId, role: "delivery" });
+    const dp = await User.findOne({ _id: userId, role: "delivery" });
     if (!dp) return next(new AppError("Invalid delivery person", 400));
 
-    // Validate product
-    const product = await Product.findById(productId);
-    if (!product) return next(new AppError("Product not found", 404));
+    const createdAssignments = [];
 
-    const assignment = await Assignment.create({
-      deliveryPersonId,
-      productId,
-      assignedQuantity,
-    });
+    for (const item of assignments) {
+      const { productId, storeId, quantity } = item;
 
-    res.status(201).json({ success: true, data: assignment });
+      // Validate product
+      const product = await Product.findById(productId);
+      if (!product) {
+        return next(new AppError(`Product not found: ${productId}`, 404));
+      }
+
+      // Validate store
+      const store = await Store.findById(storeId);
+      if (!store) {
+        return next(new AppError(`Store not found: ${storeId}`, 404));
+      }
+
+      const assignment = await Assignment.create({
+        deliveryPersonId: userId,
+        productId,
+        storeId,
+        assignedQuantity: quantity,
+      });
+
+      createdAssignments.push(assignment);
+    }
+
+    res.status(201).json({ success: true, data: createdAssignments });
   } catch (error) {
     next(error);
   }
@@ -189,8 +211,69 @@ export const getAssignments = async (
   try {
     const assignments = await Assignment.find()
       .populate("deliveryPersonId", "name email")
-      .populate("productId", "name price");
+      .populate("productId", "name price")
+      .populate("storeId", "name storeId");
     res.status(200).json({ success: true, data: assignments });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAssignmentById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const assignment = await Assignment.findById(req.params.id)
+      .populate("deliveryPersonId", "name email")
+      .populate("productId", "name price")
+      .populate("storeId", "name storeId");
+
+    if (!assignment) return next(new AppError("Assignment not found", 404));
+
+    res.status(200).json({ success: true, data: assignment });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateAssignment = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const assignment = await Assignment.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      {
+        new: true,
+        runValidators: true,
+      },
+    )
+      .populate("deliveryPersonId", "name email")
+      .populate("productId", "name price")
+      .populate("storeId", "name storeId");
+
+    if (!assignment) return next(new AppError("Assignment not found", 404));
+
+    res.status(200).json({ success: true, data: assignment });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteAssignment = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const assignment = await Assignment.findByIdAndDelete(req.params.id);
+    if (!assignment) return next(new AppError("Assignment not found", 404));
+
+    res.status(200).json({ success: true, data: {} });
   } catch (error) {
     next(error);
   }

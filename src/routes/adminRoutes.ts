@@ -11,6 +11,9 @@ import {
   deleteUser,
   createAssignment,
   getAssignments,
+  getAssignmentById,
+  updateAssignment,
+  deleteAssignment,
   getTracking,
 } from "../controllers/adminController";
 import {
@@ -38,6 +41,12 @@ router.route("/users/:id").put(updateUser).delete(deleteUser);
 
 // Assignments
 router.route("/assignments").get(getAssignments).post(createAssignment);
+
+router
+  .route("/assignments/:id")
+  .get(getAssignmentById)
+  .patch(updateAssignment)
+  .delete(deleteAssignment);
 
 // Tracking
 router.get("/tracking", getTracking);
