@@ -13,6 +13,12 @@ import {
   getAssignments,
   getTracking,
 } from "../controllers/adminController";
+import {
+  createStore,
+  getStores,
+  updateStore,
+  deleteStore,
+} from "../controllers/storeController";
 
 const router = Router();
 
@@ -35,5 +41,10 @@ router.route("/assignments").get(getAssignments).post(createAssignment);
 
 // Tracking
 router.get("/tracking", getTracking);
+
+// Stores
+router.route("/stores").get(getStores).post(createStore);
+
+router.route("/stores/:id").put(updateStore).delete(deleteStore);
 
 export default router;
