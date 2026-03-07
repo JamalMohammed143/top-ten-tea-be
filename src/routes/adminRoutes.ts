@@ -19,6 +19,7 @@ import {
 import {
   createStore,
   getStores,
+  getStoreById,
   updateStore,
   deleteStore,
 } from "../controllers/storeController";
@@ -54,6 +55,10 @@ router.get("/tracking", getTracking);
 // Stores
 router.route("/stores").get(getStores).post(createStore);
 
-router.route("/stores/:id").put(updateStore).delete(deleteStore);
+router
+  .route("/stores/:id")
+  .get(getStoreById)
+  .put(updateStore)
+  .delete(deleteStore);
 
 export default router;

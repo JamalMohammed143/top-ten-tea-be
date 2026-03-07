@@ -27,13 +27,11 @@ app.use(morgan("dev"));
 import authRoutes from "./routes/authRoutes";
 import adminRoutes from "./routes/adminRoutes";
 import deliveryRoutes from "./routes/deliveryRoutes";
-import storeRoutes from "./routes/storeRoutes";
 
 // Routes
 app.use("/auth", authRoutes);
 app.use("/admin", adminRoutes);
 app.use("/delivery", deliveryRoutes);
-app.use("/store", storeRoutes);
 
 // Health check
 app.get("/", (req, res) => {
