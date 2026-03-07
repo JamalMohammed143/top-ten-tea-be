@@ -289,63 +289,43 @@ export const getTracking = async (
   next: NextFunction,
 ) => {
   try {
-    const { deliveryId, startDate, endDate } = req.query;
+    const { date } = req.query;
 
-    const matchStage: any = {};
+    // Determine target date (default to today)
+    const targetDate = date ? new Date(date as string) : new Date();
 
-    if (deliveryId) {
-      matchStage.deliveryPersonId = new mongoose.Types.ObjectId(
-        deliveryId as string,
-      );
-    }
+    // Define start and end of the day
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
 
-    if (startDate || endDate) {
-      matchStage.createdAt = {};
-      if (startDate) matchStage.createdAt.$gte = new Date(startDate as string);
-      if (endDate) matchStage.createdAt.$lte = new Date(endDate as string);
-    }
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
 
-    const pipeline = [
-      { $match: matchStage },
-      {
-        $group: {
-          _id: null,
-          totalQuantitySold: { $sum: "$quantitySold" },
-          totalRevenue: { $sum: "$totalAmount" },
-          totalCommission: { $sum: "$commissionEarned" },
-          deliveries: { $push: "$$ROOT" },
-        },
+    const sales = await Sale.find({
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+    })
+      .populate("deliveryPersonId", "name email")
+      .populate("productId", "name price")
+      .populate("storeId", "name storeId");
+
+    // Calculate totals
+    const totals = sales.reduce(
+      (acc, sale) => {
+        acc.totalQuantitySold += sale.quantitySold;
+        acc.totalRevenue += sale.totalAmount;
+        acc.totalCommission += sale.commissionEarned;
+        return acc;
       },
-      {
-        $project: {
-          _id: 0,
-          totalQuantitySold: 1,
-          totalRevenue: 1,
-          totalCommission: 1,
-          deliveries: 1,
-        },
+      { totalQuantitySold: 0, totalRevenue: 0, totalCommission: 0 },
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...totals,
+        deliveries: sales,
       },
-    ];
-
-    const result = await Sale.aggregate(pipeline);
-
-    if (result.length === 0) {
-      return res.status(200).json({
-        success: true,
-        data: {
-          totalQuantitySold: 0,
-          totalRevenue: 0,
-          totalCommission: 0,
-          deliveries: [],
-        },
-      });
-    }
-
-    // Populate deliveries manually if needed, or return as is. The requirements say return the list of deliveries.
-    // If we want populated product/user data inside `deliveries`, we either do `$lookup` in aggregation or populate here.
-    // Let's stick to the basic aggregated response per requirements.
-
-    res.status(200).json({ success: true, data: result[0] });
+    });
   } catch (error) {
     next(error);
   }

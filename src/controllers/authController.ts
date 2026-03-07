@@ -29,8 +29,6 @@ export const login = async (
     // Role is NOT accepted from frontend, pulled from database
     const user = await User.findOne({ email }).select("+password");
 
-    console.log(user, "user");
-
     if (!user) {
       return next(new AppError("Invalid credentials", 401));
     }
