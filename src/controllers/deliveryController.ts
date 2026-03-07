@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { Assignment } from "../models/Assignment";
 import { Sale } from "../models/Sale";
 import { Product } from "../models/Product";
+import { Store } from "../models/Store";
 import { AppError } from "../utils/AppError";
 
 export const getAssignedProducts = async (
@@ -28,8 +29,49 @@ export const createSale = async (
   next: NextFunction,
 ) => {
   try {
-    const { productId, quantity, amount, storeId } = req.body;
+    const {
+      productId,
+      quantity,
+      amount,
+      storeId,
+      customStoreName,
+      address,
+      contactNo,
+    } = req.body;
     const deliveryPersonId = req.user?._id;
+
+    let finalStoreId = storeId;
+
+    if (!finalStoreId && customStoreName) {
+      if (!address || !contactNo) {
+        return next(
+          new AppError(
+            "Address and contact number are required for new stores",
+            400,
+          ),
+        );
+      }
+
+      // Check if store already exists by name
+      let store = await Store.findOne({ name: customStoreName });
+
+      if (!store) {
+        // Create new store
+        // Generate a simple storeId (e.g., S-TIMESTAMP)
+        const generatedId = `S-${Date.now()}`;
+        store = await Store.create({
+          name: customStoreName,
+          storeId: generatedId,
+          address,
+          contactNo,
+        });
+      }
+      finalStoreId = store._id;
+    }
+
+    if (!finalStoreId) {
+      return next(new AppError("Store information is required", 400));
+    }
 
     // Validate assignment
     /* const assignment = await Assignment.findOne({
@@ -68,7 +110,7 @@ export const createSale = async (
       productId,
       quantitySold,
       amountPerProduct: product.price,
-      storeId,
+      storeId: finalStoreId,
       totalAmount,
       commissionEarned,
     });
