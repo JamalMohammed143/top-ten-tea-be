@@ -29,15 +29,7 @@ export const createSale = async (
   next: NextFunction,
 ) => {
   try {
-    const {
-      productId,
-      quantity,
-      amount,
-      storeId,
-      customStoreName,
-      address,
-      contactNo,
-    } = req.body;
+    const { storeId, customStoreName, address, contactNo, items } = req.body;
     const deliveryPersonId = req.user?._id;
 
     let finalStoreId = storeId;
@@ -73,49 +65,45 @@ export const createSale = async (
       return next(new AppError("Store information is required", 400));
     }
 
-    // Validate assignment
-    /* const assignment = await Assignment.findOne({
-      deliveryPersonId,
-      productId,
-    });
-    if (!assignment) {
-      return next(
-        new AppError("You are not assigned to sell this product", 403),
-      );
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return next(new AppError("At least one product item is required", 400));
     }
 
-    if (assignment.assignedQuantity < quantitySold) {
-      return next(new AppError("Not enough assigned quantity to sell", 400));
-    } */
+    const createdSales = [];
 
-    // Get product to calculate commission
-    const product = await Product.findById(productId);
-    if (!product) {
-      return next(new AppError("Product not found", 404));
+    // Generate a unique billId for this submission
+    const billId = `BILL-${Date.now()}`;
+
+    // Process each item
+    for (const item of items) {
+      const { productId, quantity, amount } = item;
+      console.log(productId, quantity, amount);
+      // Get product to calculate commission
+      const product = await Product.findById(productId);
+      if (!product) {
+        // Option: skip or return error for the whole request.
+        // Given typically these are atomic, let's return error if any product is missing.
+        return next(new AppError(`Product not found: ${productId}`, 404));
+      }
+
+      const commissionEarned = (amount * 10) / 100;
+
+      // Create Sale record
+      const sale = await Sale.create({
+        deliveryPersonId,
+        productId,
+        billId,
+        quantitySold: quantity,
+        amountPerProduct: product.price,
+        storeId: finalStoreId,
+        totalAmount: amount,
+        commissionEarned,
+      });
+
+      createdSales.push(sale);
     }
 
-    const quantitySold = quantity;
-    // const totalAmount = quantitySold * amountPerProduct;
-    const totalAmount = amount;
-    // Commission Logic: commissionEarned = (quantitySold * amountPerProduct * commissionPercentage) / 100
-    const commissionEarned = (amount * 10) / 100;
-
-    // Reduce assigned quantity
-    // assignment.assignedQuantity -= quantitySold;
-    // await assignment.save();
-
-    // Create Sale record
-    const sale = await Sale.create({
-      deliveryPersonId,
-      productId,
-      quantitySold,
-      amountPerProduct: product.price,
-      storeId: finalStoreId,
-      totalAmount,
-      commissionEarned,
-    });
-
-    res.status(201).json({ success: true, data: sale });
+    res.status(201).json({ success: true, data: createdSales });
   } catch (error) {
     next(error);
   }
@@ -129,7 +117,8 @@ export const getMySales = async (
   try {
     const sales = await Sale.find({ deliveryPersonId: req.user?._id })
       .populate("productId", "name")
-      .populate("storeId", "name");
+      .populate("storeId", "name")
+      .sort({ createdAt: -1 });
 
     // Calculate totals
     const totals = sales.reduce(
@@ -141,12 +130,40 @@ export const getMySales = async (
       { totalSales: 0, totalCommission: 0 },
     );
 
+    // Group by billId
+    const groupedMap = new Map();
+
+    sales.forEach((sale: any) => {
+      const bId = sale.billId;
+      if (!groupedMap.has(bId)) {
+        groupedMap.set(bId, {
+          billId: bId,
+          storeName: sale.storeId?.name || "Unknown Store",
+          createdAt: sale.createdAt,
+          totalAmount: 0,
+          totalCommission: 0,
+          items: [],
+        });
+      }
+
+      const group = groupedMap.get(bId);
+      group.totalAmount += sale.totalAmount;
+      group.totalCommission += sale.commissionEarned;
+      group.items.push({
+        productName: sale.productId?.name || "Unknown Product",
+        quantitySold: sale.quantitySold,
+        amountPerProduct: sale.amountPerProduct,
+        totalAmount: sale.totalAmount,
+        commissionEarned: sale.commissionEarned,
+      });
+    });
+
     res.status(200).json({
       success: true,
       data: {
         totalSales: totals.totalSales,
         totalCommission: totals.totalCommission,
-        sales,
+        bills: Array.from(groupedMap.values()),
       },
     });
   } catch (error) {
