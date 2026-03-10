@@ -46,6 +46,7 @@ router.route("/assignments").get(getAssignments).post(createAssignment);
 router
   .route("/assignments/:id")
   .get(getAssignmentById)
+  .put(updateAssignment)
   .patch(updateAssignment)
   .delete(deleteAssignment);
 

@@ -17,11 +17,13 @@ export const createProduct = async (
   next: NextFunction,
 ) => {
   try {
-    const { name, productCode, price, netQuantity } = req.body;
+    const { name, productCode, price, netQuantity, commissionPerPiece } =
+      req.body;
     const product = await Product.create({
       name,
       productCode,
       price,
+      commissionPerPiece,
       netQuantity,
       createdBy: req.user?._id,
     });

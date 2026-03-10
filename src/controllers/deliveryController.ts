@@ -86,7 +86,7 @@ export const createSale = async (
         return next(new AppError(`Product not found: ${productId}`, 404));
       }
 
-      const commissionEarned = (amount * 10) / 100;
+      const commissionEarned = product.commissionPerPiece * quantity;
 
       // Create Sale record
       const sale = await Sale.create({
