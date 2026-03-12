@@ -11,11 +11,18 @@ export const getAssignedProducts = async (
   next: NextFunction,
 ) => {
   try {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
     const assignments = await Assignment.find({
       deliveryPersonId: req.user?._id,
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
     })
-      .populate("productId", "name price commissionPercentage")
-      .populate("storeId", "name storeId");
+      .populate("productId", "name price incentivePerPiece")
+      .populate("storeId", "name storeId groupName address contactNo");
 
     res.status(200).json({ success: true, data: assignments });
   } catch (error) {
@@ -76,8 +83,8 @@ export const createSale = async (
 
     // Process each item
     for (const item of items) {
-      const { productId, quantity, amount } = item;
-      console.log(productId, quantity, amount);
+      const { productId, quantity, amount, pricePerUnit } = item;
+      console.log(productId, quantity, amount, pricePerUnit);
       // Get product to calculate commission
       const product = await Product.findById(productId);
       if (!product) {
@@ -86,7 +93,7 @@ export const createSale = async (
         return next(new AppError(`Product not found: ${productId}`, 404));
       }
 
-      const commissionEarned = product.commissionPerPiece * quantity;
+      const incentiveEarned = product.incentivePerPiece * quantity;
 
       // Create Sale record
       const sale = await Sale.create({
@@ -94,10 +101,10 @@ export const createSale = async (
         productId,
         billId,
         quantitySold: quantity,
-        amountPerProduct: product.price,
+        amountPerProduct: pricePerUnit || product.price,
         storeId: finalStoreId,
         totalAmount: amount,
-        commissionEarned,
+        incentiveEarned,
       });
 
       createdSales.push(sale);
@@ -124,10 +131,10 @@ export const getMySales = async (
     const totals = sales.reduce(
       (acc, sale) => {
         acc.totalSales += sale.totalAmount;
-        acc.totalCommission += sale.commissionEarned;
+        acc.totalIncentive += sale.incentiveEarned;
         return acc;
       },
-      { totalSales: 0, totalCommission: 0 },
+      { totalSales: 0, totalIncentive: 0 },
     );
 
     // Group by billId
@@ -141,20 +148,20 @@ export const getMySales = async (
           storeName: sale.storeId?.name || "Unknown Store",
           createdAt: sale.createdAt,
           totalAmount: 0,
-          totalCommission: 0,
+          totalIncentive: 0,
           items: [],
         });
       }
 
       const group = groupedMap.get(bId);
       group.totalAmount += sale.totalAmount;
-      group.totalCommission += sale.commissionEarned;
+      group.totalIncentive += sale.incentiveEarned;
       group.items.push({
         productName: sale.productId?.name || "Unknown Product",
         quantitySold: sale.quantitySold,
         amountPerProduct: sale.amountPerProduct,
         totalAmount: sale.totalAmount,
-        commissionEarned: sale.commissionEarned,
+        incentiveEarned: sale.incentiveEarned,
       });
     });
 
@@ -162,7 +169,7 @@ export const getMySales = async (
       success: true,
       data: {
         totalSales: totals.totalSales,
-        totalCommission: totals.totalCommission,
+        totalIncentive: totals.totalIncentive,
         bills: Array.from(groupedMap.values()),
       },
     });

@@ -4,7 +4,7 @@ export interface IProduct extends Document {
   name: string;
   productCode: string;
   price: number;
-  commissionPerPiece: number;
+  incentivePerPiece: number;
   netQuantity: number;
   createdBy: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -15,7 +15,7 @@ const ProductSchema: Schema = new Schema(
     name: { type: String, required: true },
     productCode: { type: String, required: true, unique: true },
     price: { type: Number, required: true },
-    commissionPerPiece: { type: Number, required: true, default: 0 },
+    incentivePerPiece: { type: Number, required: true, default: 0 },
     netQuantity: { type: Number, required: true, default: 0 },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,

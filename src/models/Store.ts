@@ -3,6 +3,8 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IStore extends Document {
   name: string;
   storeId: string;
+  groupName?: string;
+  areaName?: string;
   address?: string;
   contactNo?: string;
   message?: string;
@@ -14,6 +16,8 @@ const StoreSchema: Schema = new Schema(
   {
     name: { type: String, required: true },
     storeId: { type: String, required: true, unique: true },
+    groupName: { type: String },
+    areaName: { type: String },
     address: { type: String },
     contactNo: { type: String },
     message: { type: String },

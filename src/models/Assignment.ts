@@ -3,7 +3,8 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IAssignment extends Document {
   deliveryPersonId: mongoose.Types.ObjectId;
   productId: mongoose.Types.ObjectId;
-  storeId: mongoose.Types.ObjectId;
+  storeId?: mongoose.Types.ObjectId;
+  groupName?: string;
   assignedQuantity: number;
   createdAt: Date;
 }
@@ -23,8 +24,8 @@ const AssignmentSchema: Schema = new Schema(
     storeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Store",
-      required: true,
     },
+    groupName: { type: String },
     assignedQuantity: { type: Number, required: true, default: 0 },
   },
   {

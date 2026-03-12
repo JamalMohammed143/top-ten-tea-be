@@ -15,6 +15,8 @@ import {
   updateAssignment,
   deleteAssignment,
   getTracking,
+  getSettlementDetails,
+  createSettlement,
 } from "../controllers/adminController";
 import {
   createStore,
@@ -22,6 +24,8 @@ import {
   getStoreById,
   updateStore,
   deleteStore,
+  createStoresBulk,
+  getStoreGroups,
 } from "../controllers/storeController";
 
 const router = Router();
@@ -50,10 +54,14 @@ router
   .patch(updateAssignment)
   .delete(deleteAssignment);
 
-// Tracking
+// Tracking & Settlement
 router.get("/tracking", getTracking);
+router.get("/tracking/settlement/:deliveryPersonId", getSettlementDetails);
+router.post("/settlements", createSettlement);
 
 // Stores
+router.get("/stores/groups", getStoreGroups);
+router.post("/stores/bulk", createStoresBulk);
 router.route("/stores").get(getStores).post(createStore);
 
 router

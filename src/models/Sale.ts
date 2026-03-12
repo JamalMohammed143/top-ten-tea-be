@@ -8,7 +8,7 @@ export interface ISale extends Document {
   amountPerProduct: number;
   storeId: mongoose.Types.ObjectId;
   totalAmount: number;
-  commissionEarned: number;
+  incentiveEarned: number;
   createdAt: Date;
 }
 
@@ -33,7 +33,7 @@ const SaleSchema: Schema = new Schema(
       required: true,
     },
     totalAmount: { type: Number, required: true },
-    commissionEarned: { type: Number, required: true },
+    incentiveEarned: { type: Number, required: true },
   },
   {
     timestamps: true,
