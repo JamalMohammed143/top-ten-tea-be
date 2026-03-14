@@ -31,7 +31,10 @@ export const getStores = async (
   next: NextFunction,
 ) => {
   try {
-    const stores = await Store.find();
+    const { groupName } = req.query;
+    const query = groupName ? { groupName: groupName as string } : {};
+    
+    const stores = await Store.find(query);
     res.status(200).json({ success: true, data: stores });
   } catch (error) {
     next(error);

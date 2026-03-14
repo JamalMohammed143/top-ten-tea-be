@@ -32,6 +32,12 @@ const router = Router();
 
 // Apply middleware to all admin routes
 router.use(authenticate);
+
+// Special case: Allow delivery users to GET stores
+router.get("/stores", authorize("admin", "delivery"), getStores);
+router.get("/stores/groups", authorize("admin", "delivery"), getStoreGroups);
+router.get("/stores/:id", authorize("admin", "delivery"), getStoreById);
+
 router.use(authorize("admin"));
 
 // Products
@@ -60,13 +66,11 @@ router.get("/tracking/settlement/:deliveryPersonId", getSettlementDetails);
 router.post("/settlements", createSettlement);
 
 // Stores
-router.get("/stores/groups", getStoreGroups);
 router.post("/stores/bulk", createStoresBulk);
-router.route("/stores").get(getStores).post(createStore);
+router.post("/stores", createStore);
 
 router
   .route("/stores/:id")
-  .get(getStoreById)
   .put(updateStore)
   .delete(deleteStore);
 
