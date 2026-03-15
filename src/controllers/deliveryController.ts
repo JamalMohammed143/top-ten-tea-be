@@ -95,6 +95,8 @@ export const createSale = async (
 
       const incentiveEarned = product.incentivePerPiece * quantity;
 
+      console.log("incentiveEarned", incentiveEarned);
+
       // Create Sale record
       const sale = await Sale.create({
         deliveryPersonId,
@@ -130,8 +132,8 @@ export const getMySales = async (
     // Calculate totals
     const totals = sales.reduce(
       (acc, sale) => {
-        acc.totalSales += sale.totalAmount;
-        acc.totalIncentive += sale.incentiveEarned;
+        acc.totalSales += sale.totalAmount || 0;
+        acc.totalIncentive += sale.incentiveEarned || 0;
         return acc;
       },
       { totalSales: 0, totalIncentive: 0 },
@@ -154,14 +156,14 @@ export const getMySales = async (
       }
 
       const group = groupedMap.get(bId);
-      group.totalAmount += sale.totalAmount;
-      group.totalIncentive += sale.incentiveEarned;
+      group.totalAmount += sale.totalAmount || 0;
+      group.totalIncentive += sale.incentiveEarned || 0;
       group.items.push({
         productName: sale.productId?.name || "Unknown Product",
-        quantitySold: sale.quantitySold,
-        amountPerProduct: sale.amountPerProduct,
-        totalAmount: sale.totalAmount,
-        incentiveEarned: sale.incentiveEarned,
+        quantitySold: sale.quantitySold || 0,
+        amountPerProduct: sale.amountPerProduct || 0,
+        totalAmount: sale.totalAmount || 0,
+        incentiveEarned: sale.incentiveEarned || 0,
       });
     });
 

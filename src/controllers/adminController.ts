@@ -46,6 +46,23 @@ export const getProducts = async (
   }
 };
 
+export const getProductById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const product = await Product.findById(req.params.id).populate(
+      "createdBy",
+      "name email",
+    );
+    if (!product) return next(new AppError("Product not found", 404));
+    res.status(200).json({ success: true, data: product });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const updateProduct = async (
   req: Request,
   res: Response,
@@ -334,9 +351,9 @@ export const getTracking = async (
     // Calculate totals
     const totals = sales.reduce(
       (acc, sale) => {
-        acc.totalQuantitySold += sale.quantitySold;
-        acc.totalRevenue += sale.totalAmount;
-        acc.totalIncentive += sale.incentiveEarned;
+        acc.totalQuantitySold += sale.quantitySold || 0;
+        acc.totalRevenue += sale.totalAmount || 0;
+        acc.totalIncentive += sale.incentiveEarned || 0;
         return acc;
       },
       { totalQuantitySold: 0, totalRevenue: 0, totalIncentive: 0 },
@@ -399,9 +416,9 @@ export const getSettlementDetails = async (
     const visitedStoreIds = new Set<string>();
 
     sales.forEach(s => {
-      totalQuantitySold += s.quantitySold;
-      totalSalesAmount += s.totalAmount;
-      totalIncentive += s.incentiveEarned;
+      totalQuantitySold += s.quantitySold || 0;
+      totalSalesAmount += s.totalAmount || 0;
+      totalIncentive += s.incentiveEarned || 0;
       if (s.storeId) visitedStoreIds.add(s.storeId._id.toString());
     });
 

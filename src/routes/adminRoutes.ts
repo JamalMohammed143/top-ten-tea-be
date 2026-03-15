@@ -3,6 +3,7 @@ import { authenticate, authorize } from "../middlewares/authMiddleware";
 import {
   createProduct,
   getProducts,
+  getProductById,
   updateProduct,
   deleteProduct,
   createUser,
@@ -43,7 +44,11 @@ router.use(authorize("admin"));
 // Products
 router.route("/products").get(getProducts).post(createProduct);
 
-router.route("/products/:id").put(updateProduct).delete(deleteProduct);
+router
+  .route("/products/:id")
+  .get(getProductById)
+  .put(updateProduct)
+  .delete(deleteProduct);
 
 // Users
 router.route("/users").get(getUsers).post(createUser);
