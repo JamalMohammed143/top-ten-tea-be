@@ -240,7 +240,7 @@ export const getAssignments = async (
   next: NextFunction,
 ) => {
   try {
-    const assignments = await Assignment.find()
+    const assignments = await Assignment.find({ status: "active" })
       .populate("deliveryPersonId", "name email")
       .populate("productId", "name price")
       .populate("storeId", "name storeId");
@@ -343,6 +343,7 @@ export const getTracking = async (
 
     const sales = await Sale.find({
       createdAt: { $gte: startOfDay, $lte: endOfDay },
+      status: "active",
     })
       .populate("deliveryPersonId", "name email")
       .populate("productId", "name price")
@@ -390,12 +391,14 @@ export const getSettlementDetails = async (
     const assignments = await Assignment.find({
       deliveryPersonId,
       createdAt: { $gte: startOfDay, $lte: endOfDay },
+      status: "active",
     }).populate("productId", "name price").populate("storeId", "name storeId groupName");
 
     // 2. Get today's sales for this person
     const sales = await Sale.find({
       deliveryPersonId,
       createdAt: { $gte: startOfDay, $lte: endOfDay },
+      status: "active",
     }).populate("productId", "name").populate("storeId", "name");
 
     // 3. Calculate metrics
@@ -498,8 +501,43 @@ export const createSettlement = async (
       status: "completed",
     });
 
+    // Mark current assignments and sales as settled
+    await Assignment.updateMany(
+      {
+        deliveryPersonId,
+        createdAt: { $gte: startOfDay, $lte: endOfDay },
+        status: "active",
+      },
+      { status: "settled" },
+    );
+
+    await Sale.updateMany(
+      {
+        deliveryPersonId,
+        createdAt: { $gte: startOfDay, $lte: endOfDay },
+        status: "active",
+      },
+      { status: "settled" },
+    );
+
     res.status(201).json({ success: true, data: settlement });
 
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getSettlements = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const settlements = await Settlement.find()
+      .populate("deliveryPersonId", "name email")
+      .sort({ date: -1 });
+      
+    res.status(200).json({ success: true, data: settlements });
   } catch (error) {
     next(error);
   }

@@ -17,6 +17,7 @@ import {
   deleteAssignment,
   getTracking,
   getSettlementDetails,
+  getSettlements,
   createSettlement,
 } from "../controllers/adminController";
 import {
@@ -68,6 +69,7 @@ router
 // Tracking & Settlement
 router.get("/tracking", getTracking);
 router.get("/tracking/settlement/:deliveryPersonId", getSettlementDetails);
+router.get("/settlements", getSettlements);
 router.post("/settlements", createSettlement);
 
 // Stores

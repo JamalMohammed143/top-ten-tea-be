@@ -20,6 +20,7 @@ export const getAssignedProducts = async (
     const assignments = await Assignment.find({
       deliveryPersonId: req.user?._id,
       createdAt: { $gte: startOfDay, $lte: endOfDay },
+      status: "active",
     })
       .populate("productId", "name price incentivePerPiece")
       .populate("storeId", "name storeId groupName address contactNo");
@@ -124,7 +125,10 @@ export const getMySales = async (
   next: NextFunction,
 ) => {
   try {
-    const sales = await Sale.find({ deliveryPersonId: req.user?._id })
+    const sales = await Sale.find({ 
+      deliveryPersonId: req.user?._id,
+      status: "active" 
+    })
       .populate("productId", "name")
       .populate("storeId", "name")
       .sort({ createdAt: -1 });

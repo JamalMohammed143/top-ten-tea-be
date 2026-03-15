@@ -6,6 +6,7 @@ export interface IAssignment extends Document {
   storeId?: mongoose.Types.ObjectId;
   groupName?: string;
   assignedQuantity: number;
+  status: "active" | "settled";
   createdAt: Date;
 }
 
@@ -27,6 +28,11 @@ const AssignmentSchema: Schema = new Schema(
     },
     groupName: { type: String },
     assignedQuantity: { type: Number, required: true, default: 0 },
+    status: {
+      type: String,
+      enum: ["active", "settled"],
+      default: "active",
+    },
   },
   {
     timestamps: true,

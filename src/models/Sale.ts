@@ -9,6 +9,7 @@ export interface ISale extends Document {
   storeId: mongoose.Types.ObjectId;
   totalAmount: number;
   incentiveEarned: number;
+  status: "active" | "settled";
   createdAt: Date;
 }
 
@@ -34,6 +35,11 @@ const SaleSchema: Schema = new Schema(
     },
     totalAmount: { type: Number, required: true },
     incentiveEarned: { type: Number, required: true },
+    status: {
+      type: String,
+      enum: ["active", "settled"],
+      default: "active",
+    },
   },
   {
     timestamps: true,
