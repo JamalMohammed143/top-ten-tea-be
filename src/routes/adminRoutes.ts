@@ -36,8 +36,8 @@ const router = Router();
 router.use(authenticate);
 
 // Special case: Allow delivery users to GET stores
-router.get("/stores", authorize("admin", "delivery"), getStores);
 router.get("/stores/groups", authorize("admin", "delivery"), getStoreGroups);
+router.get("/stores", authorize("admin", "delivery"), getStores);
 router.get("/stores/:id", authorize("admin", "delivery"), getStoreById);
 
 router.use(authorize("admin"));
@@ -72,7 +72,7 @@ router.get("/tracking/settlement/:deliveryPersonId", getSettlementDetails);
 router.get("/settlements", getSettlements);
 router.post("/settlements", createSettlement);
 
-// Stores
+// Stores (Admin only mutations)
 router.post("/stores/bulk", createStoresBulk);
 router.post("/stores", createStore);
 

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { Store } from "../models/Store";
 import { AppError } from "../utils/AppError";
+import mongoose from "mongoose";
 
 export const createStore = async (
   req: Request,
@@ -47,7 +48,8 @@ export const getStoreById = async (
   next: NextFunction,
 ) => {
   try {
-    const store = await Store.findById(req.params.id);
+    const { id } = req.params;
+    const store = await Store.findById(id);
     if (!store) return next(new AppError("Store not found", 404));
     res.status(200).json({ success: true, data: store });
   } catch (error) {
@@ -61,8 +63,9 @@ export const updateStore = async (
   next: NextFunction,
 ) => {
   try {
-    const store = await Store.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
+    const { id } = req.params;
+    const store = await Store.findByIdAndUpdate(id, req.body, {
+      returnDocument: "after",
       runValidators: true,
     });
     if (!store) return next(new AppError("Store not found", 404));
@@ -78,7 +81,8 @@ export const deleteStore = async (
   next: NextFunction,
 ) => {
   try {
-    const store = await Store.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
+    const store = await Store.findByIdAndDelete(id);
     if (!store) return next(new AppError("Store not found", 404));
     res.status(200).json({ success: true, data: {} });
   } catch (error) {
