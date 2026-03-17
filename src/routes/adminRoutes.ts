@@ -26,7 +26,6 @@ import {
   getStoreById,
   updateStore,
   deleteStore,
-  createStoresBulk,
   getStoreGroups,
 } from "../controllers/storeController";
 
@@ -73,7 +72,6 @@ router.get("/settlements", getSettlements);
 router.post("/settlements", createSettlement);
 
 // Stores (Admin only mutations)
-router.post("/stores/bulk", createStoresBulk);
 router.post("/stores", createStore);
 
 router

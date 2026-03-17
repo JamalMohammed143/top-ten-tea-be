@@ -90,36 +90,6 @@ export const deleteStore = async (
   }
 };
 
-export const createStoresBulk = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const { stores } = req.body;
-
-    if (!stores || !Array.isArray(stores) || stores.length === 0) {
-      return next(new AppError("Invalid stores data", 400));
-    }
-
-    const createdStores = await Store.insertMany(stores, { ordered: false });
-
-    res.status(201).json({
-      success: true,
-      message: `${createdStores.length} stores created successfully`,
-      data: createdStores,
-    });
-  } catch (error: any) {
-    if (error.code === 11000) {
-      return res.status(207).json({
-        success: true,
-        message: "Some stores were inserted, some failed due to duplicates",
-        insertedCount: error.insertedDocs?.length || 0,
-      });
-    }
-    next(error);
-  }
-};
 
 export const getStoreGroups = async (
   req: Request,

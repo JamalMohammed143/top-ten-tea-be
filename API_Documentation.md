@@ -47,11 +47,7 @@ Base URL: `http://localhost:5000` (or your deployed domain)
 - **POST** `/admin/stores`
 - **Body:** `{ "name", "storeId", "groupName", "areaName", "address", "contactNo", "message" }`
 
-#### 4. Bulk Upload Stores
-- **POST** `/admin/stores/bulk`
-- **Body:** `{ "stores": [ { "name", "storeId", "groupName", "areaName", "address", "contactNo" }, ... ] }`
-
-#### 5. Update / Delete Store
+#### 4. Update / Delete Store
 - **PUT** `/admin/stores/:id`
 - **DELETE** `/admin/stores/:id`
 
