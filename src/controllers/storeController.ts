@@ -35,7 +35,7 @@ export const getStores = async (
     const { groupName } = req.query;
     const query = groupName ? { groupName: groupName as string } : {};
     
-    const stores = await Store.find(query);
+    const stores = await Store.find(query).sort({ groupName: 1 });
     res.status(200).json({ success: true, data: stores });
   } catch (error) {
     next(error);
