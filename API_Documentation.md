@@ -109,7 +109,50 @@ Base URL: `http://localhost:5000` (or your deployed domain)
 }
 ```
 
-#### 3. Submit Final Settlement
+#### 3. Get All Settlements (Enriched)
+- **GET** `/admin/settlements`
+- **Auth:** Admin Token required
+- **Description:** Returns all completed settlements enriched with per-store and per-product sales breakdowns.
+- **Response Data (each item):**
+```json
+{
+  "_id": "...",
+  "deliveryPerson": { "_id": "...", "name": "Ali", "email": "ali@..." },
+  "date": "2026-03-19T...",
+  "totalSalesAmount": 15000,
+  "totalIncentive": 1500,
+  "petrolAllowance": 500,
+  "finalTotal": 13000,
+  "status": "completed",
+  "totalQuantitySold": 150,
+  "storesVisited": 10,
+  "storeBreakdown": [
+    {
+      "store": { "_id": "...", "name": "Store A", "storeId": "S001", "groupName": "North", "areaName": "Zone 1", "address": "..." },
+      "storeTotalAmount": 5000,
+      "items": [
+        {
+          "product": { "_id": "...", "name": "Tea X", "productCode": "TX01", "price": 500, "incentivePerPiece": 10 },
+          "quantitySold": 10,
+          "amountPerProduct": 500,
+          "totalAmount": 5000,
+          "incentiveEarned": 100
+        }
+      ]
+    }
+  ],
+  "productSummary": [
+    {
+      "product": { "_id": "...", "name": "Tea X", "productCode": "TX01" },
+      "totalQuantitySold": 150,
+      "totalAmount": 15000,
+      "totalIncentive": 1500
+    }
+  ]
+}
+```
+
+#### 4. Submit Final Settlement
 - **POST** `/admin/settlements`
 - **Body:**
 ```json

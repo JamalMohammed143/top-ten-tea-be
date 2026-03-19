@@ -535,9 +535,83 @@ export const getSettlements = async (
   try {
     const settlements = await Settlement.find()
       .populate("deliveryPersonId", "name email")
-      .sort({ date: -1 });
-      
-    res.status(200).json({ success: true, data: settlements });
+      .sort({ date: -1 })
+      .lean();
+
+    const enriched = await Promise.all(
+      settlements.map(async (settlement) => {
+        const settlementDate = new Date(settlement.date);
+        const startOfDay = new Date(settlementDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(settlementDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        // Fetch settled sales for this delivery person on this day
+        const sales = await Sale.find({
+          deliveryPersonId: settlement.deliveryPersonId,
+          createdAt: { $gte: startOfDay, $lte: endOfDay },
+          status: "settled",
+        })
+          .populate("storeId", "name storeId groupName areaName address")
+          .populate("productId", "name productCode price incentivePerPiece")
+          .lean();
+
+        // Build store breakdown map
+        const storeMap = new Map<string, any>();
+        let totalQuantitySold = 0;
+
+        for (const sale of sales) {
+          totalQuantitySold += sale.quantitySold;
+          const storeKey = String((sale.storeId as any)?._id ?? sale.storeId);
+
+          if (!storeMap.has(storeKey)) {
+            storeMap.set(storeKey, {
+              store: sale.storeId,
+              items: [],
+              storeTotalAmount: 0,
+            });
+          }
+          const storeEntry = storeMap.get(storeKey);
+          storeEntry.items.push({
+            product: sale.productId,
+            quantitySold: sale.quantitySold,
+            amountPerProduct: sale.amountPerProduct,
+            totalAmount: sale.totalAmount,
+            incentiveEarned: sale.incentiveEarned,
+          });
+          storeEntry.storeTotalAmount += sale.totalAmount;
+        }
+
+        // Build product summary map
+        const productMap = new Map<string, any>();
+        for (const sale of sales) {
+          const productKey = String((sale.productId as any)?._id ?? sale.productId);
+          if (!productMap.has(productKey)) {
+            productMap.set(productKey, {
+              product: sale.productId,
+              totalQuantitySold: 0,
+              totalAmount: 0,
+              totalIncentive: 0,
+            });
+          }
+          const productEntry = productMap.get(productKey);
+          productEntry.totalQuantitySold += sale.quantitySold;
+          productEntry.totalAmount += sale.totalAmount;
+          productEntry.totalIncentive += sale.incentiveEarned;
+        }
+
+        return {
+          ...settlement,
+          deliveryPerson: settlement.deliveryPersonId,
+          totalQuantitySold,
+          storesVisited: storeMap.size,
+          storeBreakdown: Array.from(storeMap.values()),
+          productSummary: Array.from(productMap.values()),
+        };
+      })
+    );
+
+    res.status(200).json({ success: true, data: enriched });
   } catch (error) {
     next(error);
   }
