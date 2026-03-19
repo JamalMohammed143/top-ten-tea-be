@@ -22,7 +22,7 @@ export const getAssignedProducts = async (
       createdAt: { $gte: startOfDay, $lte: endOfDay },
       status: "active",
     })
-      .populate("productId", "name price incentivePerPiece")
+      .populate("productId", "name price incentivePerPiece netQuantity")
       .populate("storeId", "name storeId groupName address contactNo");
 
     res.status(200).json({ success: true, data: assignments });
@@ -129,7 +129,7 @@ export const getMySales = async (
       deliveryPersonId: req.user?._id,
       status: "active" 
     })
-      .populate("productId", "name")
+      .populate("productId", "name netQuantity")
       .populate("storeId", "name")
       .sort({ createdAt: -1 });
 

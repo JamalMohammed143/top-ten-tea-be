@@ -4,7 +4,7 @@ export interface IAssignment extends Document {
   deliveryPersonId: mongoose.Types.ObjectId;
   productId: mongoose.Types.ObjectId;
   storeId?: mongoose.Types.ObjectId;
-  groupName?: string;
+  groupNames?: string[];
   assignedQuantity: number;
   status: "active" | "settled";
   createdAt: Date;
@@ -26,7 +26,7 @@ const AssignmentSchema: Schema = new Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Store",
     },
-    groupName: { type: String },
+    groupNames: [{ type: String }],
     assignedQuantity: { type: Number, required: true, default: 0 },
     status: {
       type: String,

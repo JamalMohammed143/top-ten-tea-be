@@ -192,7 +192,7 @@ export const createAssignment = async (
     const createdAssignments = [];
 
     for (const item of assignments) {
-      const { productId, storeId, groupName, quantity } = item;
+      const { productId, storeId, groupNames, quantity } = item;
 
       // Validate product
       const product = await Product.findById(productId);
@@ -212,7 +212,7 @@ export const createAssignment = async (
         deliveryPersonId: userId,
         productId,
         storeId,
-        groupName,
+        groupNames,
         assignedQuantity: quantity,
       });
 
@@ -242,8 +242,8 @@ export const getAssignments = async (
   try {
     const assignments = await Assignment.find({ status: "active" })
       .populate("deliveryPersonId", "name email")
-      .populate("productId", "name price")
-      .populate("storeId", "name storeId");
+      .populate("productId", "name netQuantity")
+      .populate("storeId", "name storeId groupName");
     const totalAssignedQuantity = assignments.reduce(
       (sum, a) => sum + a.assignedQuantity,
       0,
@@ -267,8 +267,8 @@ export const getAssignmentById = async (
   try {
     const assignment = await Assignment.findById(req.params.id)
       .populate("deliveryPersonId", "name email")
-      .populate("productId", "name price")
-      .populate("storeId", "name storeId");
+      .populate("productId", "name netQuantity")
+      .populate("storeId", "name storeId groupName");
 
     if (!assignment) return next(new AppError("Assignment not found", 404));
 
@@ -293,8 +293,8 @@ export const updateAssignment = async (
       },
     )
       .populate("deliveryPersonId", "name email")
-      .populate("productId", "name price")
-      .populate("storeId", "name storeId");
+      .populate("productId", "name netQuantity")
+      .populate("storeId", "name storeId groupName");
 
     if (!assignment) return next(new AppError("Assignment not found", 404));
 
@@ -346,7 +346,7 @@ export const getTracking = async (
       status: "active",
     })
       .populate("deliveryPersonId", "name email")
-      .populate("productId", "name price")
+      .populate("productId", "name netQuantity")
       .populate("storeId", "name storeId");
 
     // Calculate totals
@@ -392,25 +392,32 @@ export const getSettlementDetails = async (
       deliveryPersonId,
       createdAt: { $gte: startOfDay, $lte: endOfDay },
       status: "active",
-    }).populate("productId", "name price").populate("storeId", "name storeId groupName");
+    })
+      .populate("productId", "name netQuantity")
+      .populate("storeId", "name storeId groupName");
 
     // 2. Get today's sales for this person
     const sales = await Sale.find({
       deliveryPersonId,
       createdAt: { $gte: startOfDay, $lte: endOfDay },
       status: "active",
-    }).populate("productId", "name").populate("storeId", "name");
+    })
+      .populate("productId", "name")
+      .populate("storeId", "name");
 
     // 3. Calculate metrics
     let totalAssignedQuantity = 0;
     const assignedProductIds: string[] = [];
     const assignedGroupNames = new Set<string>();
 
-    assignments.forEach(a => {
+    assignments.forEach((a) => {
       totalAssignedQuantity += a.assignedQuantity;
       if (a.productId) assignedProductIds.push(a.productId._id.toString());
-      if (a.groupName) assignedGroupNames.add(a.groupName);
-      else if ((a as any).storeId?.groupName) assignedGroupNames.add((a as any).storeId.groupName);
+      if (a.groupNames && Array.isArray(a.groupNames)) {
+        a.groupNames.forEach((gn) => assignedGroupNames.add(gn));
+      } else if ((a as any).storeId?.groupName) {
+        assignedGroupNames.add((a as any).storeId.groupName);
+      }
     });
 
     let totalQuantitySold = 0;
@@ -418,7 +425,7 @@ export const getSettlementDetails = async (
     let totalIncentive = 0;
     const visitedStoreIds = new Set<string>();
 
-    sales.forEach(s => {
+    sales.forEach((s) => {
       totalQuantitySold += s.quantitySold || 0;
       totalSalesAmount += s.totalAmount || 0;
       totalIncentive += s.incentiveEarned || 0;
@@ -431,11 +438,11 @@ export const getSettlementDetails = async (
     let unvisitedStores: any[] = [];
     if (assignedGroupNames.size > 0) {
       const allStoresInGroup = await Store.find({
-        groupName: { $in: Array.from(assignedGroupNames) }
+        groupName: { $in: Array.from(assignedGroupNames) },
       });
-      
+
       unvisitedStores = allStoresInGroup.filter(
-        store => !visitedStoreIds.has(store._id.toString())
+        (store) => !visitedStoreIds.has(store._id.toString()),
       );
     }
 
@@ -451,9 +458,8 @@ export const getSettlementDetails = async (
         unvisitedStoresCount: unvisitedStores.length,
         unvisitedStores,
         sales,
-      }
+      },
     });
-
   } catch (error) {
     next(error);
   }
@@ -467,10 +473,16 @@ export const createSettlement = async (
   next: NextFunction,
 ) => {
   try {
-    const { deliveryPersonId, date, petrolAllowance, totalSalesAmount, totalIncentive } = req.body;
+    const {
+      deliveryPersonId,
+      date,
+      petrolAllowance,
+      totalSalesAmount,
+      totalIncentive,
+    } = req.body;
 
     const targetDate = date ? new Date(date as string) : new Date();
-    
+
     // Check if settlement already exists
     const startOfDay = new Date(targetDate);
     startOfDay.setHours(0, 0, 0, 0);
@@ -479,11 +491,13 @@ export const createSettlement = async (
 
     const existingSettlement = await Settlement.findOne({
       deliveryPersonId,
-      date: { $gte: startOfDay, $lte: endOfDay }
+      date: { $gte: startOfDay, $lte: endOfDay },
     });
 
     if (existingSettlement) {
-      return next(new AppError("Settlement already created for this date.", 400));
+      return next(
+        new AppError("Settlement already created for this date.", 400),
+      );
     }
 
     const petrolAmount = parseFloat(petrolAllowance) || 0;
@@ -521,7 +535,6 @@ export const createSettlement = async (
     );
 
     res.status(201).json({ success: true, data: settlement });
-
   } catch (error) {
     next(error);
   }
@@ -585,7 +598,9 @@ export const getSettlements = async (
         // Build product summary map
         const productMap = new Map<string, any>();
         for (const sale of sales) {
-          const productKey = String((sale.productId as any)?._id ?? sale.productId);
+          const productKey = String(
+            (sale.productId as any)?._id ?? sale.productId,
+          );
           if (!productMap.has(productKey)) {
             productMap.set(productKey, {
               product: sale.productId,
@@ -608,7 +623,7 @@ export const getSettlements = async (
           storeBreakdown: Array.from(storeMap.values()),
           productSummary: Array.from(productMap.values()),
         };
-      })
+      }),
     );
 
     res.status(200).json({ success: true, data: enriched });
