@@ -139,7 +139,7 @@ export const createSale = async (
       }
 
       if (assignment) {
-        assignment.assignedQuantity -= quantity;
+        assignment.remainingQuantity -= quantity;
         await assignment.save();
       }
 

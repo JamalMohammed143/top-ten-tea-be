@@ -214,6 +214,7 @@ export const createAssignment = async (
         storeId,
         groupNames,
         assignedQuantity: quantity,
+        remainingQuantity: quantity,
       });
 
       createdAssignments.push(assignment);
@@ -407,11 +408,13 @@ export const getSettlementDetails = async (
 
     // 3. Calculate metrics
     let totalAssignedQuantity = 0;
+    let totalRemainingQuantity = 0;
     const assignedProductIds: string[] = [];
     const assignedGroupNames = new Set<string>();
 
     assignments.forEach((a) => {
       totalAssignedQuantity += a.assignedQuantity;
+      totalRemainingQuantity += a.remainingQuantity;
       if (a.productId) assignedProductIds.push(a.productId._id.toString());
       if (a.groupNames && Array.isArray(a.groupNames)) {
         a.groupNames.forEach((gn) => assignedGroupNames.add(gn));
@@ -432,7 +435,7 @@ export const getSettlementDetails = async (
       if (s.storeId) visitedStoreIds.add(s.storeId._id.toString());
     });
 
-    const unsoldQuantity = totalAssignedQuantity - totalQuantitySold;
+    const unsoldQuantity = totalRemainingQuantity;
 
     // // Find unvisited stores within the assigned groups
     let unvisitedStores: any[] = [];
@@ -515,24 +518,18 @@ export const createSettlement = async (
       status: "completed",
     });
 
-    // Mark current assignments and sales as settled
-    await Assignment.updateMany(
-      {
-        deliveryPersonId,
-        createdAt: { $gte: startOfDay, $lte: endOfDay },
-        status: "active",
-      },
-      { status: "settled" },
-    );
+    // Delete current assignments and sales as settlement is done
+    await Assignment.deleteMany({
+      deliveryPersonId,
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      status: "active",
+    });
 
-    await Sale.updateMany(
-      {
-        deliveryPersonId,
-        createdAt: { $gte: startOfDay, $lte: endOfDay },
-        status: "active",
-      },
-      { status: "settled" },
-    );
+    await Sale.deleteMany({
+      deliveryPersonId,
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      status: "active",
+    });
 
     res.status(201).json({ success: true, data: settlement });
   } catch (error) {
