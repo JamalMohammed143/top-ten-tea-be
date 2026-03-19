@@ -73,6 +73,9 @@ export const createSale = async (
       return next(new AppError("Store information is required", 400));
     }
 
+    // Fetch store details to match assignments by groupName if needed
+    const currentStore = await Store.findById(finalStoreId);
+
     if (!items || !Array.isArray(items) || items.length === 0) {
       return next(new AppError("At least one product item is required", 400));
     }
@@ -97,6 +100,48 @@ export const createSale = async (
       const incentiveEarned = product.incentivePerPiece * quantity;
 
       console.log("incentiveEarned", incentiveEarned);
+
+      // Reduce from assignment
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+
+      // Hierarchical search for the most relevant assignment
+      let assignment = await Assignment.findOne({
+        deliveryPersonId,
+        productId,
+        storeId: finalStoreId,
+        status: "active",
+        createdAt: { $gte: startOfDay, $lte: endOfDay },
+      });
+
+      if (!assignment && currentStore?.groupName) {
+        assignment = await Assignment.findOne({
+          deliveryPersonId,
+          productId,
+          groupNames: currentStore.groupName,
+          status: "active",
+          createdAt: { $gte: startOfDay, $lte: endOfDay },
+        });
+      }
+
+      if (!assignment) {
+        // General assignment (no specific store or group)
+        assignment = await Assignment.findOne({
+          deliveryPersonId,
+          productId,
+          storeId: { $exists: false },
+          groupNames: { $size: 0 },
+          status: "active",
+          createdAt: { $gte: startOfDay, $lte: endOfDay },
+        });
+      }
+
+      if (assignment) {
+        assignment.assignedQuantity -= quantity;
+        await assignment.save();
+      }
 
       // Create Sale record
       const sale = await Sale.create({

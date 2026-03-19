@@ -33,10 +33,19 @@ export const getStores = async (
   next: NextFunction,
 ) => {
   try {
-    const { groupName } = req.query;
-    let query: any = groupName ? { groupName: groupName as string } : {};
+    const { groupNames } = req.query;
+    
+    // Ensure groupNames is an array
+    const queryGroupNames = Array.isArray(groupNames)
+      ? (groupNames as string[])
+      : groupNames
+        ? [groupNames as string]
+        : [];
 
-    // If delivery person, only show stores from assigned groups for today
+    let query: any =
+      queryGroupNames.length > 0 ? { groupName: { $in: queryGroupNames } } : {};
+
+    // If delivery person, restrict their view to assigned groups/stores
     if (req.user?.role === "delivery") {
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
@@ -56,24 +65,24 @@ export const getStores = async (
         }
       });
 
-      // If no groups assigned, they see no stores (unless they have store-specific assignments, but those aren't handled here yet)
-      // Actually, if they have store-specific assignments, those stores should also be visible.
       const assignedStoreIds = assignments
         .filter((a: any) => a.storeId)
         .map((a: any) => a.storeId);
 
-      query = {
+      const assignedQuery = {
         $or: [
           { groupName: { $in: Array.from(assignedGroupNames) } },
           { _id: { $in: assignedStoreIds } },
         ],
       };
 
-      // If a groupName filter was already provided in query, it must be within the assigned groups
-      if (groupName) {
+      // Combine with the frontend's requested filter
+      if (queryGroupNames.length > 0) {
         query = {
-          $and: [query, { groupName: groupName as string }],
+          $and: [assignedQuery, { groupName: { $in: queryGroupNames } }],
         };
+      } else {
+        query = assignedQuery;
       }
     }
 
@@ -132,7 +141,6 @@ export const deleteStore = async (
   }
 };
 
-
 export const getStoreGroups = async (
   req: Request,
   res: Response,
@@ -141,7 +149,7 @@ export const getStoreGroups = async (
   try {
     const groups = await Store.distinct("groupName");
     // Filter out null or empty strings if any
-    const filteredGroups = groups.filter(g => g && g.trim() !== "");
+    const filteredGroups = groups.filter((g) => g && g.trim() !== "");
     res.status(200).json({ success: true, data: filteredGroups });
   } catch (error) {
     next(error);
