@@ -7,6 +7,10 @@ export interface ISettlement extends Document {
   totalIncentive: number;
   petrolAllowance: number;
   finalTotal: number;
+  soldStoreList: string[];
+  soldStoreCount: number;
+  totalStoreAssignedCount: number;
+  assignedGroupNames: string[];
   status: "completed";
   createdAt: Date;
 }
@@ -26,6 +30,10 @@ const SettlementSchema: Schema = new Schema(
     totalIncentive: { type: Number, required: true },
     petrolAllowance: { type: Number, required: true, default: 0 },
     finalTotal: { type: Number, required: true },
+    soldStoreList: [{ type: String }],
+    soldStoreCount: { type: Number, default: 0 },
+    totalStoreAssignedCount: { type: Number, default: 0 },
+    assignedGroupNames: [{ type: String }],
     status: {
       type: String,
       enum: ["completed"],

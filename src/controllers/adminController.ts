@@ -508,6 +508,43 @@ export const createSettlement = async (
     // Adjust logic based on exact business rule. Here finalTotal = totalSales - incentive - petrol
     const finalTotal = totalSalesAmount - totalIncentive - petrolAmount;
 
+    // Fetch data for the new metadata fields BEFORE deleting records
+    const assignments = await Assignment.find({
+      deliveryPersonId,
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      status: "active",
+    }).populate("storeId", "name storeId groupName");
+
+    const sales = await Sale.find({
+      deliveryPersonId,
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      status: "active",
+    }).populate("storeId", "name");
+
+    // Calculate metadata
+    const assignedGroupNames = new Set<string>();
+    assignments.forEach((a) => {
+      if (a.groupNames && Array.isArray(a.groupNames)) {
+        a.groupNames.forEach((gn) => assignedGroupNames.add(gn));
+      } else if ((a as any).storeId?.groupName) {
+        assignedGroupNames.add((a as any).storeId.groupName);
+      }
+    });
+
+    const soldStoreNames = new Set<string>();
+    sales.forEach((s) => {
+      if (s.storeId) {
+        soldStoreNames.add((s.storeId as any).name);
+      }
+    });
+
+    let totalStoreAssignedCount = 0;
+    if (assignedGroupNames.size > 0) {
+      totalStoreAssignedCount = await Store.countDocuments({
+        groupName: { $in: Array.from(assignedGroupNames) },
+      });
+    }
+
     const settlement = await Settlement.create({
       deliveryPersonId,
       date: targetDate,
@@ -515,6 +552,10 @@ export const createSettlement = async (
       totalIncentive,
       petrolAllowance: petrolAmount,
       finalTotal,
+      soldStoreList: Array.from(soldStoreNames),
+      soldStoreCount: soldStoreNames.size,
+      totalStoreAssignedCount,
+      assignedGroupNames: Array.from(assignedGroupNames),
       status: "completed",
     });
 
