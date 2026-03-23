@@ -492,17 +492,6 @@ export const createSettlement = async (
     const endOfDay = new Date(targetDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const existingSettlement = await Settlement.findOne({
-      deliveryPersonId,
-      date: { $gte: startOfDay, $lte: endOfDay },
-    });
-
-    if (existingSettlement) {
-      return next(
-        new AppError("Settlement already created for this date.", 400),
-      );
-    }
-
     const petrolAmount = parseFloat(petrolAllowance) || 0;
     // Payout Logic: Typically Delivery agent pays admin (Sales - Incentive + Petrol Allowance) or similar,
     // Adjust logic based on exact business rule. Here finalTotal = totalSales - incentive - petrol
@@ -584,13 +573,40 @@ export const getSettlements = async (
   next: NextFunction,
 ) => {
   try {
-    const settlements = await Settlement.find()
+    const { date, startDate, endDate, deliveryPersonId } = req.query;
+    let query: any = {};
+
+    if (deliveryPersonId) {
+      query.deliveryPersonId = deliveryPersonId;
+    }
+
+    if (date) {
+      const startOfDay = new Date(date as string);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(date as string);
+      endOfDay.setHours(23, 59, 59, 999);
+      query.date = { $gte: startOfDay, $lte: endOfDay };
+    } else if (startDate || endDate) {
+      query.date = {};
+      if (startDate) {
+        const start = new Date(startDate as string);
+        start.setHours(0, 0, 0, 0);
+        query.date.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        query.date.$lte = end;
+      }
+    }
+
+    const settlements = await Settlement.find(query)
       .populate("deliveryPersonId", "name email")
       .sort({ date: -1 })
       .lean();
 
     const enriched = await Promise.all(
-      settlements.map(async (settlement) => {
+      settlements.map(async (settlement: any) => {
         const settlementDate = new Date(settlement.date);
         const startOfDay = new Date(settlementDate);
         startOfDay.setHours(0, 0, 0, 0);
