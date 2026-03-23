@@ -33,17 +33,26 @@ export const getStores = async (
   next: NextFunction,
 ) => {
   try {
-    const { groupNames } = req.query;
-    
+    const rawGroupNames = req.query.groupNames || req.query["groupNames[]"];
+    console.log("rawGroupNames", rawGroupNames);
+
+    const { search } = req.query;
+
     // Ensure groupNames is an array
-    const queryGroupNames = Array.isArray(groupNames)
-      ? (groupNames as string[])
-      : groupNames
-        ? [groupNames as string]
+    const queryGroupNames = Array.isArray(rawGroupNames)
+      ? (rawGroupNames as string[])
+      : rawGroupNames
+        ? [rawGroupNames as string]
         : [];
 
-    let query: any =
-      queryGroupNames.length > 0 ? { groupName: { $in: queryGroupNames } } : {};
+    let query: any = {};
+    if (queryGroupNames.length > 0) {
+      query.groupName = { $in: queryGroupNames };
+    }
+
+    if (search) {
+      query.name = { $regex: search as string, $options: "i" };
+    }
 
     // If delivery person, restrict their view to assigned groups/stores
     if (req.user?.role === "delivery") {
@@ -77,16 +86,24 @@ export const getStores = async (
       };
 
       // Combine with the frontend's requested filter
+      const filters: any[] = [assignedQuery];
+
       if (queryGroupNames.length > 0) {
-        query = {
-          $and: [assignedQuery, { groupName: { $in: queryGroupNames } }],
-        };
+        filters.push({ groupName: { $in: queryGroupNames } });
+      }
+
+      if (search) {
+        filters.push({ name: { $regex: search as string, $options: "i" } });
+      }
+
+      if (filters.length > 1) {
+        query = { $and: filters };
       } else {
         query = assignedQuery;
       }
     }
 
-    const stores = await Store.find(query).sort({ groupName: 1 });
+    const stores = await Store.find(query).sort({ groupName: 1, storeId: 1 });
     res.status(200).json({ success: true, data: stores });
   } catch (error) {
     next(error);
@@ -148,9 +165,13 @@ export const getStoreGroups = async (
 ) => {
   try {
     const groups = await Store.distinct("groupName");
-    // Filter out null or empty strings if any
-    const filteredGroups = groups.filter((g) => g && g.trim() !== "");
-    res.status(200).json({ success: true, data: filteredGroups });
+    // Trim each group name and remove duplicates that may arise after trimming
+    const trimmedGroups = groups
+      .filter((g) => g && g.trim() !== "")
+      .map((g) => g.trim());
+    const uniqueGroups = Array.from(new Set(trimmedGroups));
+
+    res.status(200).json({ success: true, data: uniqueGroups });
   } catch (error) {
     next(error);
   }
