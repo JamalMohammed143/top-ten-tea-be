@@ -209,6 +209,7 @@ export const getMySales = async (
       group.totalIncentive += sale.incentiveEarned || 0;
       group.items.push({
         productName: sale.productId?.name || "Unknown Product",
+        netQuantity: sale.productId?.netQuantity || 0,
         quantitySold: sale.quantitySold || 0,
         amountPerProduct: sale.amountPerProduct || 0,
         totalAmount: sale.totalAmount || 0,

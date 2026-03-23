@@ -403,7 +403,7 @@ export const getSettlementDetails = async (
       createdAt: { $gte: startOfDay, $lte: endOfDay },
       status: "active",
     })
-      .populate("productId", "name")
+      .populate("productId", "name netQuantity")
       .populate("storeId", "name");
 
     // 3. Calculate metrics
