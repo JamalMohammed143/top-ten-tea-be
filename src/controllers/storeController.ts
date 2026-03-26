@@ -103,7 +103,7 @@ export const getStores = async (
       }
     }
 
-    const stores = await Store.find(query).sort({ groupName: 1, storeId: 1 });
+    const stores = await Store.find(query).sort({ groupName: 1, areaName: 1 });
     res.status(200).json({ success: true, data: stores });
   } catch (error) {
     next(error);
