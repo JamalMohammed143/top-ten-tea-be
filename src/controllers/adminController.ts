@@ -508,7 +508,9 @@ export const createSettlement = async (
       deliveryPersonId,
       createdAt: { $gte: startOfDay, $lte: endOfDay },
       status: "active",
-    }).populate("storeId", "name");
+    })
+      .populate("storeId", "name")
+      .populate("productId", "name netQuantity");
 
     // Calculate metadata
     const assignedGroupNames = new Set<string>();
@@ -520,12 +522,38 @@ export const createSettlement = async (
       }
     });
 
-    const soldStoreNames = new Set<string>();
-    sales.forEach((s) => {
-      if (s.storeId) {
-        soldStoreNames.add((s.storeId as any).name);
+    const groupedBillsMap = new Map();
+    let totalQuantitySold = 0;
+
+    sales.forEach((sale: any) => {
+      totalQuantitySold += sale.quantitySold || 0;
+      const bId = sale.billId;
+      if (!groupedBillsMap.has(bId)) {
+        groupedBillsMap.set(bId, {
+          billId: bId,
+          storeName: sale.storeId?.name || "Unknown Store",
+          storeId: sale.storeId?._id || "Unknown Store",
+          createdAt: sale.createdAt,
+          totalAmount: 0,
+          totalIncentive: 0,
+          items: [],
+        });
       }
+
+      const bill = groupedBillsMap.get(bId);
+      bill.totalAmount += sale.totalAmount || 0;
+      bill.totalIncentive += sale.incentiveEarned || 0;
+      bill.items.push({
+        productName: sale.productId?.name || "Unknown Product",
+        netQuantity: sale.productId?.netQuantity || 0,
+        quantitySold: sale.quantitySold || 0,
+        amountPerProduct: sale.amountPerProduct || 0,
+        totalAmount: sale.totalAmount || 0,
+        incentiveEarned: sale.incentiveEarned || 0,
+      });
     });
+
+    const billList = Array.from(groupedBillsMap.values());
 
     let totalStoreAssignedCount = 0;
     if (assignedGroupNames.size > 0) {
@@ -541,8 +569,9 @@ export const createSettlement = async (
       totalIncentive,
       petrolAllowance: petrolAmount,
       finalTotal,
-      soldStoreList: Array.from(soldStoreNames),
-      soldStoreCount: soldStoreNames.size,
+      billList,
+      soldStoreCount: groupedBillsMap.size,
+      totalQuantitySold,
       totalStoreAssignedCount,
       assignedGroupNames: Array.from(assignedGroupNames),
       status: "completed",
@@ -607,74 +636,47 @@ export const getSettlements = async (
 
     const enriched = await Promise.all(
       settlements.map(async (settlement: any) => {
-        const settlementDate = new Date(settlement.date);
-        const startOfDay = new Date(settlementDate);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(settlementDate);
-        endOfDay.setHours(23, 59, 59, 999);
+        // Build store breakdown and product summary from billList stored in settlement
+        const storeBreakdown = (settlement.billList || []).map((bill: any) => ({
+          store: { name: bill.storeName },
+          items: (bill.items || []).map((item: any) => ({
+            product: { name: item.productName, netQuantity: item.netQuantity },
+            quantitySold: item.quantitySold,
+            amountPerProduct: item.amountPerProduct,
+            totalAmount: item.totalAmount,
+            incentiveEarned: item.incentiveEarned,
+          })),
+          storeTotalAmount: bill.totalAmount,
+        }));
 
-        // Fetch settled sales for this delivery person on this day
-        const sales = await Sale.find({
-          deliveryPersonId: settlement.deliveryPersonId,
-          createdAt: { $gte: startOfDay, $lte: endOfDay },
-          status: "settled",
-        })
-          .populate("storeId", "name storeId groupName areaName address")
-          .populate("productId", "name productCode price incentivePerPiece")
-          .lean();
-
-        // Build store breakdown map
-        const storeMap = new Map<string, any>();
-        let totalQuantitySold = 0;
-
-        for (const sale of sales) {
-          totalQuantitySold += sale.quantitySold;
-          const storeKey = String((sale.storeId as any)?._id ?? sale.storeId);
-
-          if (!storeMap.has(storeKey)) {
-            storeMap.set(storeKey, {
-              store: sale.storeId,
-              items: [],
-              storeTotalAmount: 0,
-            });
-          }
-          const storeEntry = storeMap.get(storeKey);
-          storeEntry.items.push({
-            product: sale.productId,
-            quantitySold: sale.quantitySold,
-            amountPerProduct: sale.amountPerProduct,
-            totalAmount: sale.totalAmount,
-            incentiveEarned: sale.incentiveEarned,
-          });
-          storeEntry.storeTotalAmount += sale.totalAmount;
-        }
-
-        // Build product summary map
         const productMap = new Map<string, any>();
-        for (const sale of sales) {
-          const productKey = String(
-            (sale.productId as any)?._id ?? sale.productId,
-          );
-          if (!productMap.has(productKey)) {
-            productMap.set(productKey, {
-              product: sale.productId,
-              totalQuantitySold: 0,
-              totalAmount: 0,
-              totalIncentive: 0,
-            });
-          }
-          const productEntry = productMap.get(productKey);
-          productEntry.totalQuantitySold += sale.quantitySold;
-          productEntry.totalAmount += sale.totalAmount;
-          productEntry.totalIncentive += sale.incentiveEarned;
-        }
+        (settlement.billList || []).forEach((bill: any) => {
+          (bill.items || []).forEach((item: any) => {
+            const productKey = item.productName;
+            if (!productMap.has(productKey)) {
+              productMap.set(productKey, {
+                product: {
+                  name: item.productName,
+                  netQuantity: item.netQuantity,
+                },
+                totalQuantitySold: 0,
+                totalAmount: 0,
+                totalIncentive: 0,
+              });
+            }
+            const productEntry = productMap.get(productKey);
+            productEntry.totalQuantitySold += item.quantitySold;
+            productEntry.totalAmount += item.totalAmount;
+            productEntry.totalIncentive += item.incentiveEarned;
+          });
+        });
 
         return {
           ...settlement,
           deliveryPerson: settlement.deliveryPersonId,
-          totalQuantitySold,
-          storesVisited: storeMap.size,
-          storeBreakdown: Array.from(storeMap.values()),
+          totalQuantitySold: settlement.totalQuantitySold,
+          storesVisited: settlement.soldStoreCount,
+          storeBreakdown,
           productSummary: Array.from(productMap.values()),
         };
       }),
