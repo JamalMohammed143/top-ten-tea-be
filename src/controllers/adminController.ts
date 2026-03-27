@@ -548,9 +548,11 @@ export const createSettlement = async (
     let totalOnlineAmount = 0;
     let totalOfflineAmount = 0;
     const processedBills = new Set<string>();
+    const visitedStoreIds = new Set<string>();
 
     sales.forEach((sale: any) => {
       totalQuantitySold += sale.quantitySold || 0;
+      if (sale.storeId) visitedStoreIds.add(sale.storeId._id.toString());
       const bId = sale.billId;
 
       if (bId && !processedBills.has(bId)) {
@@ -592,12 +594,18 @@ export const createSettlement = async (
     assignments.forEach((a) => {
       totalQuantityAssigned += a.assignedQuantity;
     });
- 
+
     let totalStoreAssignedCount = 0;
+    let unvisitedStores: any[] = [];
     if (assignedGroupNames.size > 0) {
-      totalStoreAssignedCount = await Store.countDocuments({
+      const allStoresInGroup = await Store.find({
         groupName: { $in: Array.from(assignedGroupNames) },
       });
+      totalStoreAssignedCount = allStoresInGroup.length;
+ 
+      unvisitedStores = allStoresInGroup.filter(
+        (store) => !visitedStoreIds.has(store._id.toString()),
+      );
     }
 
     const settlement = await Settlement.create({
@@ -615,6 +623,7 @@ export const createSettlement = async (
       totalOfflineAmount,
       totalStoreAssignedCount,
       assignedGroupNames: Array.from(assignedGroupNames),
+      unvisitedStores,
       status: "completed",
     });
 
@@ -722,6 +731,7 @@ export const getSettlements = async (
           totalOnlineAmount: settlement.totalOnlineAmount || 0,
           totalOfflineAmount: settlement.totalOfflineAmount || 0,
           storesVisited: settlement.soldStoreCount,
+          unvisitedStores: settlement.unvisitedStores || [],
           storeBreakdown,
           productSummary: Array.from(productMap.values()),
         };

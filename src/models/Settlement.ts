@@ -15,6 +15,7 @@ export interface ISettlement extends Document {
   totalQuantityAssigned: number;
   totalStoreAssignedCount: number;
   assignedGroupNames: string[];
+  unvisitedStores: any[];
   status: "completed";
   createdAt: Date;
 }
@@ -42,6 +43,7 @@ const SettlementSchema: Schema = new Schema(
     totalQuantityAssigned: { type: Number, default: 0 },
     totalStoreAssignedCount: { type: Number, default: 0 },
     assignedGroupNames: [{ type: String }],
+    unvisitedStores: [{ type: Schema.Types.Mixed }],
     status: {
       type: String,
       enum: ["completed"],
