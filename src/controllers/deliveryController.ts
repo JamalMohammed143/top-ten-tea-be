@@ -99,8 +99,6 @@ export const createSale = async (
 
       const incentiveEarned = product.incentivePerPiece * quantity;
 
-      console.log("incentiveEarned", incentiveEarned);
-
       // Reduce from assignment
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
@@ -170,9 +168,9 @@ export const getMySales = async (
   next: NextFunction,
 ) => {
   try {
-    const sales = await Sale.find({ 
+    const sales = await Sale.find({
       deliveryPersonId: req.user?._id,
-      status: "active" 
+      status: "active",
     })
       .populate("productId", "name netQuantity")
       .populate("storeId", "name")

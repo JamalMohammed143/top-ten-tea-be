@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from "express";
 import { Store } from "../models/Store";
 import { Assignment } from "../models/Assignment";
 import { AppError } from "../utils/AppError";
-import mongoose from "mongoose";
 
 export const createStore = async (
   req: Request,
@@ -34,7 +33,6 @@ export const getStores = async (
 ) => {
   try {
     const rawGroupNames = req.query.groupNames || req.query["groupNames[]"];
-    console.log("rawGroupNames", rawGroupNames);
 
     const { search } = req.query;
 
