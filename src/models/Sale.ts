@@ -8,6 +8,8 @@ export interface ISale extends Document {
   amountPerProduct: number;
   storeId: mongoose.Types.ObjectId;
   totalAmount: number;
+  onlinePaymentAmount?: number;
+  offlineAmount?: number;
   incentiveEarned: number;
   status: "active" | "settled";
   createdAt: Date;
@@ -34,6 +36,8 @@ const SaleSchema: Schema = new Schema(
       required: true,
     },
     totalAmount: { type: Number, required: true },
+    onlinePaymentAmount: { type: Number, default: 0 },
+    offlineAmount: { type: Number, default: 0 },
     incentiveEarned: { type: Number, required: true },
     status: {
       type: String,

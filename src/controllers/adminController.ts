@@ -356,9 +356,17 @@ export const getTracking = async (
         acc.totalQuantitySold += sale.quantitySold || 0;
         acc.totalRevenue += sale.totalAmount || 0;
         acc.totalIncentive += sale.incentiveEarned || 0;
+        acc.totalOnlineAmount += sale.onlinePaymentAmount || 0;
+        acc.totalOfflineAmount += sale.offlineAmount || 0;
         return acc;
       },
-      { totalQuantitySold: 0, totalRevenue: 0, totalIncentive: 0 },
+      {
+        totalQuantitySold: 0,
+        totalRevenue: 0,
+        totalIncentive: 0,
+        totalOnlineAmount: 0,
+        totalOfflineAmount: 0,
+      },
     );
 
     res.status(200).json({
@@ -426,12 +434,22 @@ export const getSettlementDetails = async (
     let totalQuantitySold = 0;
     let totalSalesAmount = 0;
     let totalIncentive = 0;
+    let totalOnlineAmount = 0;
+    let totalOfflineAmount = 0;
     const visitedStoreIds = new Set<string>();
+    const processedBills = new Set<string>();
 
     sales.forEach((s) => {
       totalQuantitySold += s.quantitySold || 0;
       totalSalesAmount += s.totalAmount || 0;
       totalIncentive += s.incentiveEarned || 0;
+
+      if (s.billId && !processedBills.has(s.billId)) {
+        totalOnlineAmount += s.onlinePaymentAmount || 0;
+        totalOfflineAmount += s.offlineAmount || 0;
+        processedBills.add(s.billId);
+      }
+
       if (s.storeId) visitedStoreIds.add(s.storeId._id.toString());
     });
 
@@ -452,11 +470,14 @@ export const getSettlementDetails = async (
     res.status(200).json({
       success: true,
       data: {
-        totalAssignedQuantity,
         totalQuantitySold,
+        totalQuantityAssigned: totalAssignedQuantity,
         unsoldQuantity,
+        totalRemainingQuantity,
         totalSalesAmount,
         totalIncentive,
+        totalOnlineAmount,
+        totalOfflineAmount,
         visitedStoresCount: visitedStoreIds.size,
         unvisitedStoresCount: unvisitedStores.length,
         unvisitedStores,
@@ -524,10 +545,20 @@ export const createSettlement = async (
 
     const groupedBillsMap = new Map();
     let totalQuantitySold = 0;
+    let totalOnlineAmount = 0;
+    let totalOfflineAmount = 0;
+    const processedBills = new Set<string>();
 
     sales.forEach((sale: any) => {
       totalQuantitySold += sale.quantitySold || 0;
       const bId = sale.billId;
+
+      if (bId && !processedBills.has(bId)) {
+        totalOnlineAmount += sale.onlinePaymentAmount || 0;
+        totalOfflineAmount += sale.offlineAmount || 0;
+        processedBills.add(bId);
+      }
+
       if (!groupedBillsMap.has(bId)) {
         groupedBillsMap.set(bId, {
           billId: bId,
@@ -536,6 +567,8 @@ export const createSettlement = async (
           createdAt: sale.createdAt,
           totalAmount: 0,
           totalIncentive: 0,
+          onlinePaymentAmount: sale.onlinePaymentAmount || 0,
+          offlineAmount: sale.offlineAmount || 0,
           items: [],
         });
       }
@@ -555,6 +588,11 @@ export const createSettlement = async (
 
     const billList = Array.from(groupedBillsMap.values());
 
+    let totalQuantityAssigned = 0;
+    assignments.forEach((a) => {
+      totalQuantityAssigned += a.assignedQuantity;
+    });
+ 
     let totalStoreAssignedCount = 0;
     if (assignedGroupNames.size > 0) {
       totalStoreAssignedCount = await Store.countDocuments({
@@ -572,6 +610,9 @@ export const createSettlement = async (
       billList,
       soldStoreCount: groupedBillsMap.size,
       totalQuantitySold,
+      totalQuantityAssigned,
+      totalOnlineAmount,
+      totalOfflineAmount,
       totalStoreAssignedCount,
       assignedGroupNames: Array.from(assignedGroupNames),
       status: "completed",
@@ -639,6 +680,8 @@ export const getSettlements = async (
         // Build store breakdown and product summary from billList stored in settlement
         const storeBreakdown = (settlement.billList || []).map((bill: any) => ({
           store: { name: bill.storeName },
+          onlinePaymentAmount: bill.onlinePaymentAmount || 0,
+          offlineAmount: bill.offlineAmount || 0,
           items: (bill.items || []).map((item: any) => ({
             product: { name: item.productName, netQuantity: item.netQuantity },
             quantitySold: item.quantitySold,
@@ -675,6 +718,9 @@ export const getSettlements = async (
           ...settlement,
           deliveryPerson: settlement.deliveryPersonId,
           totalQuantitySold: settlement.totalQuantitySold,
+          totalQuantityAssigned: settlement.totalQuantityAssigned || 0,
+          totalOnlineAmount: settlement.totalOnlineAmount || 0,
+          totalOfflineAmount: settlement.totalOfflineAmount || 0,
           storesVisited: settlement.soldStoreCount,
           storeBreakdown,
           productSummary: Array.from(productMap.values()),

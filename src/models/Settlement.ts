@@ -7,9 +7,12 @@ export interface ISettlement extends Document {
   totalIncentive: number;
   petrolAllowance: number;
   finalTotal: number;
+  totalOnlineAmount: number;
+  totalOfflineAmount: number;
   billList: any[];
   soldStoreCount: number;
   totalQuantitySold: number;
+  totalQuantityAssigned: number;
   totalStoreAssignedCount: number;
   assignedGroupNames: string[];
   status: "completed";
@@ -31,9 +34,12 @@ const SettlementSchema: Schema = new Schema(
     totalIncentive: { type: Number, required: true },
     petrolAllowance: { type: Number, required: true, default: 0 },
     finalTotal: { type: Number, required: true },
+    totalOnlineAmount: { type: Number, default: 0 },
+    totalOfflineAmount: { type: Number, default: 0 },
     billList: [{ type: Schema.Types.Mixed }],
     soldStoreCount: { type: Number, default: 0 },
     totalQuantitySold: { type: Number, default: 0 },
+    totalQuantityAssigned: { type: Number, default: 0 },
     totalStoreAssignedCount: { type: Number, default: 0 },
     assignedGroupNames: [{ type: String }],
     status: {

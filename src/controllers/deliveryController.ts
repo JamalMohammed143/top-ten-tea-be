@@ -37,7 +37,15 @@ export const createSale = async (
   next: NextFunction,
 ) => {
   try {
-    const { storeId, customStoreName, address, contactNo, items } = req.body;
+    const {
+      storeId,
+      customStoreName,
+      address,
+      contactNo,
+      items,
+      onlinePaymentAmount,
+      offlineAmount,
+    } = req.body;
     const deliveryPersonId = req.user?._id;
 
     let finalStoreId = storeId;
@@ -150,6 +158,8 @@ export const createSale = async (
         amountPerProduct: pricePerUnit || product.price,
         storeId: finalStoreId,
         totalAmount: amount,
+        onlinePaymentAmount: onlinePaymentAmount || 0,
+        offlineAmount: offlineAmount || 0,
         incentiveEarned,
       });
 
@@ -176,16 +186,6 @@ export const getMySales = async (
       .populate("storeId", "name")
       .sort({ createdAt: -1 });
 
-    // Calculate totals
-    const totals = sales.reduce(
-      (acc, sale) => {
-        acc.totalSales += sale.totalAmount || 0;
-        acc.totalIncentive += sale.incentiveEarned || 0;
-        return acc;
-      },
-      { totalSales: 0, totalIncentive: 0 },
-    );
-
     // Group by billId
     const groupedMap = new Map();
 
@@ -198,6 +198,8 @@ export const getMySales = async (
           createdAt: sale.createdAt,
           totalAmount: 0,
           totalIncentive: 0,
+          onlinePaymentAmount: sale.onlinePaymentAmount || 0,
+          offlineAmount: sale.offlineAmount || 0,
           items: [],
         });
       }
@@ -215,12 +217,28 @@ export const getMySales = async (
       });
     });
 
+    const bills = Array.from(groupedMap.values());
+
+    // Calculate totals from grouped bills to avoid double counting bill-level fields
+    const finalTotals = bills.reduce(
+      (acc, bill) => {
+        acc.totalSales += bill.totalAmount;
+        acc.totalIncentive += bill.totalIncentive;
+        acc.totalOnline += bill.onlinePaymentAmount;
+        acc.totalOffline += bill.offlineAmount;
+        return acc;
+      },
+      { totalSales: 0, totalIncentive: 0, totalOnline: 0, totalOffline: 0 },
+    );
+
     res.status(200).json({
       success: true,
       data: {
-        totalSales: totals.totalSales,
-        totalIncentive: totals.totalIncentive,
-        bills: Array.from(groupedMap.values()),
+        totalSales: finalTotals.totalSales,
+        totalIncentive: finalTotals.totalIncentive,
+        totalOnline: finalTotals.totalOnline,
+        totalOffline: finalTotals.totalOffline,
+        bills,
       },
     });
   } catch (error) {
