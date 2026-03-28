@@ -11,15 +11,15 @@ export const getAssignedProducts = async (
   next: NextFunction,
 ) => {
   try {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    // const startOfDay = new Date();
+    // startOfDay.setHours(0, 0, 0, 0);
 
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
+    // const endOfDay = new Date();
+    // endOfDay.setHours(23, 59, 59, 999);
 
     const assignments = await Assignment.find({
       deliveryPersonId: req.user?._id,
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      // createdAt: { $gte: startOfDay, $lte: endOfDay },
       status: "active",
     })
       .populate("productId", "name price incentivePerPiece netQuantity")
@@ -183,7 +183,7 @@ export const getMySales = async (
       status: "active",
     })
       .populate("productId", "name netQuantity")
-      .populate("storeId", "name")
+      .populate("storeId", "name groupName areaName address contactNo")
       .sort({ createdAt: -1 });
 
     // Group by billId
@@ -195,6 +195,10 @@ export const getMySales = async (
         groupedMap.set(bId, {
           billId: bId,
           storeName: sale.storeId?.name || "Unknown Store",
+          groupName: sale.storeId?.groupName || "Unknown Group",
+          areaName: sale.storeId?.areaName || "Unknown Area",
+          address: sale.storeId?.address || "Unknown Address",
+          contactNo: sale.storeId?.contactNo || "Unknown Contact No",
           createdAt: sale.createdAt,
           totalAmount: 0,
           totalIncentive: 0,

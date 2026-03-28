@@ -330,34 +330,38 @@ export const getTracking = async (
   next: NextFunction,
 ) => {
   try {
-    const { date } = req.query;
+    // const { date } = req.query;
 
     // Determine target date (default to today)
-    const targetDate = date ? new Date(date as string) : new Date();
+    // const targetDate = date ? new Date(date as string) : new Date();
 
     // Define start and end of the day
-    const startOfDay = new Date(targetDate);
-    startOfDay.setHours(0, 0, 0, 0);
+    // const startOfDay = new Date(targetDate);
+    // startOfDay.setHours(0, 0, 0, 0);
 
-    const endOfDay = new Date(targetDate);
-    endOfDay.setHours(23, 59, 59, 999);
+    // const endOfDay = new Date(targetDate);
+    // endOfDay.setHours(23, 59, 59, 999);
 
     const sales = await Sale.find({
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      // createdAt: { $gte: startOfDay, $lte: endOfDay },
       status: "active",
     })
       .populate("deliveryPersonId", "name email")
       .populate("productId", "name netQuantity")
-      .populate("storeId", "name storeId");
+      .populate("storeId", "name storeId groupName areaName address contactNo");
 
-    // Calculate totals
+    const processedBills = new Set<string>();
     const totals = sales.reduce(
-      (acc, sale) => {
+      (acc, sale: any) => {
         acc.totalQuantitySold += sale.quantitySold || 0;
         acc.totalRevenue += sale.totalAmount || 0;
         acc.totalIncentive += sale.incentiveEarned || 0;
-        acc.totalOnlineAmount += sale.onlinePaymentAmount || 0;
-        acc.totalOfflineAmount += sale.offlineAmount || 0;
+
+        if (sale.billId && !processedBills.has(sale.billId)) {
+          acc.totalOnlineAmount += sale.onlinePaymentAmount || 0;
+          acc.totalOfflineAmount += sale.offlineAmount || 0;
+          processedBills.add(sale.billId);
+        }
         return acc;
       },
       {
@@ -388,31 +392,30 @@ export const getSettlementDetails = async (
 ) => {
   try {
     const { deliveryPersonId } = req.params;
-    const { date } = req.query;
-
-    const targetDate = date ? new Date(date as string) : new Date();
-    const startOfDay = new Date(targetDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(targetDate);
-    endOfDay.setHours(23, 59, 59, 999);
+    // const { date } = req.query;
+    // const targetDate = date ? new Date(date as string) : new Date();
+    // const startOfDay = new Date(targetDate);
+    // startOfDay.setHours(0, 0, 0, 0);
+    // const endOfDay = new Date(targetDate);
+    // endOfDay.setHours(23, 59, 59, 999);
 
     // 1. Get today's assignments for this person
     const assignments = await Assignment.find({
       deliveryPersonId,
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      // createdAt: { $gte: startOfDay, $lte: endOfDay },
       status: "active",
     })
       .populate("productId", "name netQuantity")
-      .populate("storeId", "name storeId groupName");
+      .populate("storeId", "name groupName areaName address contactNo");
 
     // 2. Get today's sales for this person
     const sales = await Sale.find({
       deliveryPersonId,
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      // createdAt: { $gte: startOfDay, $lte: endOfDay },
       status: "active",
     })
       .populate("productId", "name netQuantity")
-      .populate("storeId", "name");
+      .populate("storeId", "name groupName areaName address contactNo");
 
     // 3. Calculate metrics
     let totalAssignedQuantity = 0;
@@ -610,6 +613,8 @@ export const createSettlement = async (
       );
     }
 
+    console.log("unvisitedStores", unvisitedStores);
+
     const settlement = await Settlement.create({
       deliveryPersonId,
       date: targetDate,
@@ -618,7 +623,7 @@ export const createSettlement = async (
       petrolAllowance: petrolAmount,
       finalTotal,
       billList,
-      soldStoreCount: groupedBillsMap.size,
+      soldStoreCount: visitedStoreIds.size,
       totalQuantitySold,
       totalQuantityAssigned,
       totalOnlineAmount,
@@ -632,13 +637,13 @@ export const createSettlement = async (
     // Delete current assignments and sales as settlement is done
     await Assignment.deleteMany({
       deliveryPersonId,
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      // createdAt: { $gte: startOfDay, $lte: endOfDay },
       status: "active",
     });
 
     await Sale.deleteMany({
       deliveryPersonId,
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      // createdAt: { $gte: startOfDay, $lte: endOfDay },
       status: "active",
     });
 

@@ -54,14 +54,14 @@ export const getStores = async (
 
     // If delivery person, restrict their view to assigned groups/stores
     if (req.user?.role === "delivery") {
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date();
-      endOfDay.setHours(23, 59, 59, 999);
+      // const startOfDay = new Date();
+      // startOfDay.setHours(0, 0, 0, 0);
+      // const endOfDay = new Date();
+      // endOfDay.setHours(23, 59, 59, 999);
 
       const assignments = await Assignment.find({
         deliveryPersonId: req.user._id,
-        createdAt: { $gte: startOfDay, $lte: endOfDay },
+        // createdAt: { $gte: startOfDay, $lte: endOfDay },
         status: "active",
       });
 
