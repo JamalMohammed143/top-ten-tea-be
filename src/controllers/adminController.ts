@@ -530,7 +530,7 @@ export const createSettlement = async (
       createdAt: { $gte: startOfDay, $lte: endOfDay },
       status: "active",
     })
-      .populate("storeId", "name")
+      .populate("storeId", "name groupName areaName")
       .populate("productId", "name netQuantity");
 
     // Calculate metadata
@@ -565,6 +565,8 @@ export const createSettlement = async (
         groupedBillsMap.set(bId, {
           billId: bId,
           storeName: sale.storeId?.name || "Unknown Store",
+          groupName: sale.storeId?.groupName || "Unknown Store",
+          areaName: sale.storeId?.areaName || "Unknown Store",
           storeId: sale.storeId?._id || "Unknown Store",
           createdAt: sale.createdAt,
           totalAmount: 0,
@@ -602,7 +604,7 @@ export const createSettlement = async (
         groupName: { $in: Array.from(assignedGroupNames) },
       });
       totalStoreAssignedCount = allStoresInGroup.length;
- 
+
       unvisitedStores = allStoresInGroup.filter(
         (store) => !visitedStoreIds.has(store._id.toString()),
       );
@@ -688,7 +690,11 @@ export const getSettlements = async (
       settlements.map(async (settlement: any) => {
         // Build store breakdown and product summary from billList stored in settlement
         const storeBreakdown = (settlement.billList || []).map((bill: any) => ({
-          store: { name: bill.storeName },
+          store: {
+            name: bill.storeName,
+            groupName: bill.groupName,
+            areaName: bill.areaName,
+          },
           onlinePaymentAmount: bill.onlinePaymentAmount || 0,
           offlineAmount: bill.offlineAmount || 0,
           items: (bill.items || []).map((item: any) => ({
