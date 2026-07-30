@@ -9,17 +9,46 @@ export const createStore = async (
   next: NextFunction,
 ) => {
   try {
-    const { name, storeId, groupName, areaName, address, contactNo, message } =
-      req.body;
-    const store = await Store.create({
-      name,
-      storeId,
-      groupName,
-      areaName,
-      address,
-      contactNo,
-      message,
-    });
+    const { name, groupName, areaName, address, contactNo, message } = req.body;
+    let { storeId } = req.body;
+
+    if (!storeId || typeof storeId !== "string" || storeId.trim() === "") {
+      storeId = await generateNextStoreId(groupName);
+    }
+
+    const maxRetries = 5;
+    let attempts = 0;
+    let store;
+
+    while (attempts < maxRetries) {
+      try {
+        store = await Store.create({
+          name,
+          storeId,
+          groupName,
+          areaName,
+          address,
+          contactNo,
+          message,
+        });
+        break;
+      } catch (error: any) {
+        const isDuplicateKey =
+          error.code === 11000 &&
+          ((error.keyValue && error.keyValue.storeId !== undefined) ||
+            (error.message &&
+              error.message.includes("dup key") &&
+              error.message.includes("storeId")));
+
+        if (isDuplicateKey && attempts < maxRetries - 1) {
+          attempts++;
+          storeId = await generateNextStoreId(groupName);
+        } else {
+          throw error;
+        }
+      }
+    }
+
     res.status(201).json({ success: true, data: store });
   } catch (error) {
     next(error);
@@ -32,20 +61,29 @@ export const getStores = async (
   next: NextFunction,
 ) => {
   try {
-    const rawGroupNames = req.query.groupNames || req.query["groupNames[]"];
-
+    const rawGroupNames = req.query.groupNames || req.query["groupNames[]"] || req.query.groupName;
     const { search } = req.query;
 
-    // Ensure groupNames is an array
     const queryGroupNames = Array.isArray(rawGroupNames)
       ? (rawGroupNames as string[])
       : rawGroupNames
         ? [rawGroupNames as string]
         : [];
 
+    const rawAreaNames = req.query.areaNames || req.query["areaNames[]"] || req.query.areaName;
+    const queryAreaNames = Array.isArray(rawAreaNames)
+      ? (rawAreaNames as string[])
+      : rawAreaNames
+        ? [rawAreaNames as string]
+        : [];
+
     let query: any = {};
     if (queryGroupNames.length > 0) {
       query.groupName = { $in: queryGroupNames };
+    }
+
+    if (queryAreaNames.length > 0) {
+      query.areaName = { $in: queryAreaNames };
     }
 
     if (search) {
@@ -54,14 +92,8 @@ export const getStores = async (
 
     // If delivery person, restrict their view to assigned groups/stores
     if (req.user?.role === "delivery") {
-      // const startOfDay = new Date();
-      // startOfDay.setHours(0, 0, 0, 0);
-      // const endOfDay = new Date();
-      // endOfDay.setHours(23, 59, 59, 999);
-
       const assignments = await Assignment.find({
         deliveryPersonId: req.user._id,
-        // createdAt: { $gte: startOfDay, $lte: endOfDay },
         status: "active",
       });
 
@@ -83,11 +115,14 @@ export const getStores = async (
         ],
       };
 
-      // Combine with the frontend's requested filter
       const filters: any[] = [assignedQuery];
 
       if (queryGroupNames.length > 0) {
         filters.push({ groupName: { $in: queryGroupNames } });
+      }
+
+      if (queryAreaNames.length > 0) {
+        filters.push({ areaName: { $in: queryAreaNames } });
       }
 
       if (search) {
@@ -101,8 +136,34 @@ export const getStores = async (
       }
     }
 
-    const stores = await Store.find(query).sort({ groupName: 1, areaName: 1 });
-    res.status(200).json({ success: true, data: stores });
+    const sortField = typeof req.query.sortBy === "string" ? req.query.sortBy : "groupName";
+    const sortDirection = req.query.sortOrder === "desc" ? -1 : 1;
+    const sortObj: any = {};
+    sortObj[sortField] = sortDirection;
+    if (sortField !== "name") {
+      sortObj.name = 1;
+    }
+
+    const parsedPage = parseInt(req.query.page as string, 10) || 1;
+    const parsedLimit = parseInt(req.query.limit as string, 10) || 100;
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    const totalCount = await Store.countDocuments(query);
+    const stores = await Store.find(query)
+      .sort(sortObj)
+      .skip(skip)
+      .limit(parsedLimit);
+
+    res.status(200).json({
+      success: true,
+      data: stores,
+      pagination: {
+        totalCount,
+        page: parsedPage,
+        limit: parsedLimit,
+        totalPages: Math.ceil(totalCount / parsedLimit),
+      }
+    });
   } catch (error) {
     next(error);
   }
@@ -174,3 +235,126 @@ export const getStoreGroups = async (
     next(error);
   }
 };
+
+export const getStoreAreas = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { groupName } = req.query;
+    const query: any = {};
+    if (groupName && groupName !== "all" && groupName !== "") {
+      query.groupName = groupName;
+    }
+    const areas = await Store.distinct("areaName", query);
+    const trimmedAreas = areas
+      .filter((a) => a && a.trim() !== "")
+      .map((a) => a.trim());
+    const uniqueAreas = Array.from(new Set(trimmedAreas));
+
+    res.status(200).json({ success: true, data: uniqueAreas });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getNextStoreId = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const groupName = typeof req.query.groupName === "string" ? req.query.groupName.trim() : undefined;
+    const nextStoreId = await generateNextStoreId(groupName);
+    res.status(200).json({ success: true, data: nextStoreId });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export async function generateNextStoreId(groupName?: string): Promise<string> {
+  if (groupName) {
+    // Query stores within this group
+    const stores = await Store.find({ groupName });
+    if (stores.length > 0) {
+      let maxNum = 0;
+      let hasValidNum = false;
+      for (const store of stores) {
+        const parsed = parseStoreIdHelper(store.storeId);
+        if (parsed.hasNum) {
+          if (parsed.num > maxNum) {
+            maxNum = parsed.num;
+          }
+          hasValidNum = true;
+        }
+      }
+      if (hasValidNum) {
+        return `${groupName}${maxNum + 1}`;
+      }
+    }
+
+    // Fallback: check overall max number in the database, prefix with groupName
+    const allStores = await Store.find({});
+    let overallMaxNum = 0;
+    let hasAnyNum = false;
+    for (const store of allStores) {
+      const parsed = parseStoreIdHelper(store.storeId);
+      if (parsed.hasNum) {
+        if (parsed.num > overallMaxNum) {
+          overallMaxNum = parsed.num;
+        }
+        hasAnyNum = true;
+      }
+    }
+    const nextNum = hasAnyNum ? overallMaxNum + 1 : 1;
+    return `${groupName}${nextNum}`;
+  } else {
+    // No groupName provided, fetch the latest store overall by createdAt descending
+    const latestStore = await Store.findOne({}).sort({ createdAt: -1 });
+    if (latestStore) {
+      const parsed = parseStoreIdHelper(latestStore.storeId);
+      if (parsed.hasNum) {
+        return `${parsed.prefix}${parsed.num + 1}`;
+      } else {
+        // If latest store ID doesn't have a trailing number, find overall max number
+        const allStores = await Store.find({});
+        let overallMaxNum = 0;
+        let hasAnyNum = false;
+        let prefix = parsed.prefix || "ST";
+        for (const store of allStores) {
+          const p = parseStoreIdHelper(store.storeId);
+          if (p.hasNum) {
+            if (p.num > overallMaxNum) {
+              overallMaxNum = p.num;
+              prefix = p.prefix || prefix;
+            }
+            hasAnyNum = true;
+          }
+        }
+        const nextNum = hasAnyNum ? overallMaxNum + 1 : 1;
+        return `${prefix}${nextNum}`;
+      }
+    }
+
+    // Database is empty
+    return "ST1";
+  }
+}
+
+function parseStoreIdHelper(storeId: string): { prefix: string; num: number; hasNum: boolean } {
+  if (!storeId) {
+    return { prefix: "", num: 0, hasNum: false };
+  }
+
+  // Find trailing digits
+  const match = storeId.match(/(\d+)$/);
+  if (match) {
+    const numStr = match[1];
+    const num = parseInt(numStr, 10);
+    const prefix = storeId.substring(0, storeId.length - numStr.length);
+    return { prefix, num, hasNum: true };
+  }
+
+  return { prefix: storeId, num: 0, hasNum: false };
+}

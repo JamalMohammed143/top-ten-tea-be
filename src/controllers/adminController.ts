@@ -754,3 +754,125 @@ export const getSettlements = async (
     next(error);
   }
 };
+
+export const getProductSalesReport = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    let start: Date;
+    let end: Date;
+
+    if (startDate) {
+      start = new Date(startDate as string);
+      start.setHours(0, 0, 0, 0);
+    } else {
+      start = new Date();
+      start.setHours(0, 0, 0, 0);
+    }
+
+    if (endDate) {
+      end = new Date(endDate as string);
+      end.setHours(23, 59, 59, 999);
+    } else {
+      end = new Date();
+      end.setHours(23, 59, 59, 999);
+    }
+
+    // 1. Fetch active sales in the date range
+    const activeSales = await Sale.find({
+      createdAt: { $gte: start, $lte: end },
+      status: "active",
+    }).populate("productId");
+
+    // 2. Fetch settled records in the date range
+    const settledRecords = await Settlement.find({
+      date: { $gte: start, $lte: end },
+    });
+
+    // 3. Fetch all products to initialize the product sales list
+    const products = await Product.find().lean();
+
+    // Map to hold aggregated data, keyed by product name
+    const reportMap = new Map<string, any>();
+
+    for (const p of products) {
+      reportMap.set(p.name, {
+        productId: p._id,
+        name: p.name,
+        productCode: p.productCode,
+        netQuantity: p.netQuantity,
+        price: p.price,
+        totalQuantitySold: 0,
+        totalRevenue: 0,
+        totalIncentive: 0,
+      });
+    }
+
+    // Process Active Sales
+    for (const sale of activeSales) {
+      const prod = sale.productId as any;
+      const productName = prod?.name || "Unknown Product";
+      let entry = reportMap.get(productName);
+
+      if (!entry) {
+        entry = {
+          productId: prod?._id || null,
+          name: productName,
+          productCode: prod?.productCode || "N/A",
+          netQuantity: prod?.netQuantity || 0,
+          price: sale.amountPerProduct || 0,
+          totalQuantitySold: 0,
+          totalRevenue: 0,
+          totalIncentive: 0,
+        };
+        reportMap.set(productName, entry);
+      }
+
+      entry.totalQuantitySold += sale.quantitySold || 0;
+      entry.totalRevenue += sale.totalAmount || 0;
+      entry.totalIncentive += sale.incentiveEarned || 0;
+    }
+
+    // Process Settled Sales
+    for (const settlement of settledRecords) {
+      for (const bill of settlement.billList || []) {
+        for (const item of bill.items || []) {
+          const productName = item.productName || "Unknown Product";
+          let entry = reportMap.get(productName);
+
+          if (!entry) {
+            entry = {
+              productId: null,
+              name: productName,
+              productCode: "N/A",
+              netQuantity: item.netQuantity || 0,
+              price: item.amountPerProduct || 0,
+              totalQuantitySold: 0,
+              totalRevenue: 0,
+              totalIncentive: 0,
+            };
+            reportMap.set(productName, entry);
+          }
+
+          entry.totalQuantitySold += item.quantitySold || 0;
+          entry.totalRevenue += item.totalAmount || 0;
+          entry.totalIncentive += item.incentiveEarned || 0;
+        }
+      }
+    }
+
+    const reportData = Array.from(reportMap.values());
+
+    res.status(200).json({
+      success: true,
+      data: reportData,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

@@ -19,6 +19,7 @@ import {
   getSettlementDetails,
   getSettlements,
   createSettlement,
+  getProductSalesReport,
 } from "../controllers/adminController";
 import {
   createStore,
@@ -27,6 +28,8 @@ import {
   updateStore,
   deleteStore,
   getStoreGroups,
+  getNextStoreId,
+  getStoreAreas,
 } from "../controllers/storeController";
 
 const router = Router();
@@ -36,7 +39,9 @@ router.use(authenticate);
 
 // Special case: Allow delivery users to GET stores
 router.get("/stores/groups", authorize("admin", "delivery"), getStoreGroups);
+router.get("/stores/areas", authorize("admin", "delivery"), getStoreAreas);
 router.get("/stores", authorize("admin", "delivery"), getStores);
+router.get("/stores/next-id", authorize("admin"), getNextStoreId);
 router.get("/stores/:id", authorize("admin", "delivery"), getStoreById);
 
 router.use(authorize("admin"));
@@ -70,6 +75,7 @@ router.get("/tracking", getTracking);
 router.get("/tracking/settlement/:deliveryPersonId", getSettlementDetails);
 router.get("/settlements", getSettlements);
 router.post("/settlements", createSettlement);
+router.get("/reports/product-sales", getProductSalesReport);
 
 // Stores (Admin only mutations)
 router.post("/stores", createStore);
