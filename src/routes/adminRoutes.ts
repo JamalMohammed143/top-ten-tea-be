@@ -20,6 +20,7 @@ import {
   getSettlements,
   createSettlement,
   getProductSalesReport,
+  getStoreSalesReport,
 } from "../controllers/adminController";
 import {
   createStore,
@@ -76,6 +77,7 @@ router.get("/tracking/settlement/:deliveryPersonId", getSettlementDetails);
 router.get("/settlements", getSettlements);
 router.post("/settlements", createSettlement);
 router.get("/reports/product-sales", getProductSalesReport);
+router.get("/reports/store-sales", getStoreSalesReport);
 
 // Stores (Admin only mutations)
 router.post("/stores", createStore);

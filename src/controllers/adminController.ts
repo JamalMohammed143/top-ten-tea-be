@@ -876,3 +876,169 @@ export const getProductSalesReport = async (
   }
 };
 
+export const getStoreSalesReport = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    let start: Date;
+    let end: Date;
+
+    if (startDate) {
+      start = new Date(startDate as string);
+      start.setHours(0, 0, 0, 0);
+    } else {
+      start = new Date();
+      start.setHours(0, 0, 0, 0);
+    }
+
+    if (endDate) {
+      end = new Date(endDate as string);
+      end.setHours(23, 59, 59, 999);
+    } else {
+      end = new Date();
+      end.setHours(23, 59, 59, 999);
+    }
+
+    // 1. Fetch all stores
+    const stores = await Store.find().lean();
+
+    // 2. Fetch active sales in the date range
+    const activeSales = await Sale.find({
+      createdAt: { $gte: start, $lte: end },
+      status: "active",
+    }).lean();
+
+    // 3. Fetch completed settlements in the date range
+    const settledRecords = await Settlement.find({
+      date: { $gte: start, $lte: end },
+    }).lean();
+
+    // 4. Initialize store metrics map
+    const storeMap = new Map<string, any>();
+
+    for (const s of stores) {
+      storeMap.set(s._id.toString(), {
+        _id: s._id,
+        storeId: s.storeId,
+        name: s.name,
+        groupName: s.groupName,
+        areaName: s.areaName,
+        address: s.address,
+        contactNo: s.contactNo,
+        message: s.message,
+        feedback: (s as any).feedback || "",
+        totalRevenue: 0,
+        totalVolume: 0,
+        totalIncentive: 0,
+        lastPurchaseDate: null,
+      });
+    }
+
+    // Process Active Sales inside range
+    for (const sale of activeSales) {
+      const storeIdStr = sale.storeId?.toString();
+      if (!storeIdStr) continue;
+
+      const entry = storeMap.get(storeIdStr);
+      if (!entry) continue;
+
+      entry.totalVolume += sale.quantitySold || 0;
+      entry.totalRevenue += sale.totalAmount || 0;
+      entry.totalIncentive += sale.incentiveEarned || 0;
+    }
+
+    // Process Settled Sales (Settlements) inside range
+    for (const settlement of settledRecords) {
+      for (const bill of settlement.billList || []) {
+        const storeIdStr = bill.storeId?.toString();
+        if (!storeIdStr) continue;
+
+        const entry = storeMap.get(storeIdStr);
+        if (!entry) continue;
+
+        entry.totalRevenue += bill.totalAmount || 0;
+        entry.totalIncentive += bill.totalIncentive || 0;
+        const volume = (bill.items || []).reduce(
+          (sum: number, item: any) => sum + (item.quantitySold || 0),
+          0,
+        );
+        entry.totalVolume += volume;
+      }
+    }
+
+    // 5. Gather last purchase dates (EVER)
+    // Find last purchase date in active sales
+    const allActiveSales = await Sale.find({ status: "active" })
+      .select("storeId createdAt")
+      .lean();
+    for (const sale of allActiveSales) {
+      const storeIdStr = sale.storeId?.toString();
+      if (!storeIdStr) continue;
+
+      const entry = storeMap.get(storeIdStr);
+      if (entry) {
+        const saleDate = new Date(sale.createdAt);
+        if (!entry.lastPurchaseDate || saleDate > entry.lastPurchaseDate) {
+          entry.lastPurchaseDate = saleDate;
+        }
+      }
+    }
+
+    // Find last purchase date in settlements
+    const allSettlements = await Settlement.find()
+      .select("date billList")
+      .lean();
+    for (const settlement of allSettlements) {
+      const settleDate = new Date(settlement.date);
+      for (const bill of settlement.billList || []) {
+        const storeIdStr = bill.storeId?.toString();
+        if (!storeIdStr) continue;
+
+        const entry = storeMap.get(storeIdStr);
+        if (entry) {
+          if (!entry.lastPurchaseDate || settleDate > entry.lastPurchaseDate) {
+            entry.lastPurchaseDate = settleDate;
+          }
+        }
+      }
+    }
+
+    // 6. Enrich with daysSinceLastPurchase and engagementStatus
+    const today = new Date();
+    const result = Array.from(storeMap.values()).map((entry) => {
+      let daysSinceLastPurchase = null;
+      let engagementStatus = "Neglected"; // Default status if never purchased
+
+      if (entry.lastPurchaseDate) {
+        const diffTime = Math.abs(today.getTime() - entry.lastPurchaseDate.getTime());
+        daysSinceLastPurchase = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (daysSinceLastPurchase <= 15) {
+          engagementStatus = "Active";
+        } else if (daysSinceLastPurchase <= 30) {
+          engagementStatus = "Needs Attention";
+        } else {
+          engagementStatus = "Neglected";
+        }
+      }
+
+      return {
+        ...entry,
+        daysSinceLastPurchase,
+        engagementStatus,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

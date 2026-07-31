@@ -8,6 +8,7 @@ export interface IStore extends Document {
   address: string;
   contactNo: string;
   message: string;
+  feedback?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,6 +22,7 @@ const StoreSchema: Schema = new Schema(
     address: { type: String, required: true },
     contactNo: { type: String, required: true },
     message: { type: String, required: true },
+    feedback: { type: String, default: "" },
   },
   {
     timestamps: true,
