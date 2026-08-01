@@ -796,11 +796,11 @@ export const getProductSalesReport = async (
     // 3. Fetch all products to initialize the product sales list
     const products = await Product.find().lean();
 
-    // Map to hold aggregated data, keyed by product name
+    // Map to hold aggregated data, keyed by product ID string (or synthetic key for unknown items)
     const reportMap = new Map<string, any>();
 
     for (const p of products) {
-      reportMap.set(p.name, {
+      reportMap.set(p._id.toString(), {
         productId: p._id,
         name: p.name,
         productCode: p.productCode,
@@ -815,21 +815,23 @@ export const getProductSalesReport = async (
     // Process Active Sales
     for (const sale of activeSales) {
       const prod = sale.productId as any;
-      const productName = prod?.name || "Unknown Product";
-      let entry = reportMap.get(productName);
+      if (!prod) continue;
+      
+      const prodIdStr = prod._id.toString();
+      let entry = reportMap.get(prodIdStr);
 
       if (!entry) {
         entry = {
-          productId: prod?._id || null,
-          name: productName,
-          productCode: prod?.productCode || "N/A",
-          netQuantity: prod?.netQuantity || 0,
+          productId: prod._id,
+          name: prod.name || "Unknown Product",
+          productCode: prod.productCode || "N/A",
+          netQuantity: prod.netQuantity || 0,
           price: sale.amountPerProduct || 0,
           totalQuantitySold: 0,
           totalRevenue: 0,
           totalIncentive: 0,
         };
-        reportMap.set(productName, entry);
+        reportMap.set(prodIdStr, entry);
       }
 
       entry.totalQuantitySold += sale.quantitySold || 0;
@@ -842,20 +844,42 @@ export const getProductSalesReport = async (
       for (const bill of settlement.billList || []) {
         for (const item of bill.items || []) {
           const productName = item.productName || "Unknown Product";
-          let entry = reportMap.get(productName);
+          const netQuantity = item.netQuantity || 0;
+
+          // Find the corresponding product from the products array
+          // using productName and netQuantity
+          const matchedProduct = products.find(
+            (p) => p.name === productName && p.netQuantity === netQuantity
+          );
+
+          let prodIdStr = matchedProduct ? matchedProduct._id.toString() : null;
+
+          // If we couldn't match by name and netQuantity exactly, fallback to name-only
+          if (!prodIdStr) {
+            const nameMatchedProduct = products.find(
+              (p) => p.name.trim() === productName.trim()
+            );
+            if (nameMatchedProduct) {
+              prodIdStr = nameMatchedProduct._id.toString();
+            }
+          }
+
+          // Use matched ID as key, or fall back to synthetic key
+          const key = prodIdStr || `${productName}_${netQuantity}`;
+          let entry = reportMap.get(key);
 
           if (!entry) {
             entry = {
-              productId: null,
+              productId: prodIdStr || null,
               name: productName,
-              productCode: "N/A",
-              netQuantity: item.netQuantity || 0,
+              productCode: matchedProduct?.productCode || "N/A",
+              netQuantity: netQuantity,
               price: item.amountPerProduct || 0,
               totalQuantitySold: 0,
               totalRevenue: 0,
               totalIncentive: 0,
             };
-            reportMap.set(productName, entry);
+            reportMap.set(key, entry);
           }
 
           entry.totalQuantitySold += item.quantitySold || 0;
@@ -1014,9 +1038,11 @@ export const getStoreSalesReport = async (
       let engagementStatus = "Neglected"; // Default status if never purchased
 
       if (entry.lastPurchaseDate) {
-        const diffTime = Math.abs(today.getTime() - entry.lastPurchaseDate.getTime());
+        const diffTime = Math.abs(
+          today.getTime() - entry.lastPurchaseDate.getTime(),
+        );
         daysSinceLastPurchase = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        
+
         if (daysSinceLastPurchase <= 15) {
           engagementStatus = "Active";
         } else if (daysSinceLastPurchase <= 30) {
@@ -1041,4 +1067,3 @@ export const getStoreSalesReport = async (
     next(error);
   }
 };
-
