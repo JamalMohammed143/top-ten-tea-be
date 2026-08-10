@@ -64,18 +64,22 @@ export const getStores = async (
     const rawGroupNames = req.query.groupNames || req.query["groupNames[]"] || req.query.groupName;
     const { search } = req.query;
 
-    const queryGroupNames = Array.isArray(rawGroupNames)
-      ? (rawGroupNames as string[])
-      : rawGroupNames
-        ? [rawGroupNames as string]
-        : [];
+    const queryGroupNames = (
+      Array.isArray(rawGroupNames)
+        ? (rawGroupNames as string[])
+        : rawGroupNames
+          ? [rawGroupNames as string]
+          : []
+    ).map((gn) => gn.trim());
 
     const rawAreaNames = req.query.areaNames || req.query["areaNames[]"] || req.query.areaName;
-    const queryAreaNames = Array.isArray(rawAreaNames)
-      ? (rawAreaNames as string[])
-      : rawAreaNames
-        ? [rawAreaNames as string]
-        : [];
+    const queryAreaNames = (
+      Array.isArray(rawAreaNames)
+        ? (rawAreaNames as string[])
+        : rawAreaNames
+          ? [rawAreaNames as string]
+          : []
+    ).map((an) => an.trim());
 
     let query: any = {};
     if (queryGroupNames.length > 0) {
@@ -144,25 +148,11 @@ export const getStores = async (
       sortObj.name = 1;
     }
 
-    const parsedPage = parseInt(req.query.page as string, 10) || 1;
-    const parsedLimit = parseInt(req.query.limit as string, 10) || 100;
-    const skip = (parsedPage - 1) * parsedLimit;
-
-    const totalCount = await Store.countDocuments(query);
-    const stores = await Store.find(query)
-      .sort(sortObj)
-      .skip(skip)
-      .limit(parsedLimit);
+    const stores = await Store.find(query).sort(sortObj);
 
     res.status(200).json({
       success: true,
       data: stores,
-      pagination: {
-        totalCount,
-        page: parsedPage,
-        limit: parsedLimit,
-        totalPages: Math.ceil(totalCount / parsedLimit),
-      }
     });
   } catch (error) {
     next(error);

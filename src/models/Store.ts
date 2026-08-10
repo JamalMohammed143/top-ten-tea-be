@@ -15,14 +15,14 @@ export interface IStore extends Document {
 
 const StoreSchema: Schema = new Schema(
   {
-    name: { type: String, required: true },
-    storeId: { type: String, required: true, unique: true },
-    groupName: { type: String, required: true },
-    areaName: { type: String, required: true },
-    address: { type: String, required: true },
-    contactNo: { type: String, required: true },
-    message: { type: String, required: true },
-    feedback: { type: String, default: "" },
+    name: { type: String, required: true, trim: true },
+    storeId: { type: String, required: true, unique: true, trim: true },
+    groupName: { type: String, required: true, trim: true },
+    areaName: { type: String, required: true, trim: true },
+    address: { type: String, required: true, trim: true },
+    contactNo: { type: String, required: true, trim: true },
+    message: { type: String, required: true, trim: true },
+    feedback: { type: String, default: "", trim: true },
   },
   {
     timestamps: true,
