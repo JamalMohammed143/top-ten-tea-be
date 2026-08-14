@@ -524,13 +524,11 @@ export const createSettlement = async (
     // Fetch data for the new metadata fields BEFORE deleting records
     const assignments = await Assignment.find({
       deliveryPersonId,
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
       status: "active",
     }).populate("storeId", "name storeId groupName");
 
     const sales = await Sale.find({
       deliveryPersonId,
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
       status: "active",
     })
       .populate("storeId", "name groupName areaName")
@@ -816,7 +814,7 @@ export const getProductSalesReport = async (
     for (const sale of activeSales) {
       const prod = sale.productId as any;
       if (!prod) continue;
-      
+
       const prodIdStr = prod._id.toString();
       let entry = reportMap.get(prodIdStr);
 
@@ -849,7 +847,7 @@ export const getProductSalesReport = async (
           // Find the corresponding product from the products array
           // using productName and netQuantity
           const matchedProduct = products.find(
-            (p) => p.name === productName && p.netQuantity === netQuantity
+            (p) => p.name === productName && p.netQuantity === netQuantity,
           );
 
           let prodIdStr = matchedProduct ? matchedProduct._id.toString() : null;
@@ -857,7 +855,7 @@ export const getProductSalesReport = async (
           // If we couldn't match by name and netQuantity exactly, fallback to name-only
           if (!prodIdStr) {
             const nameMatchedProduct = products.find(
-              (p) => p.name.trim() === productName.trim()
+              (p) => p.name.trim() === productName.trim(),
             );
             if (nameMatchedProduct) {
               prodIdStr = nameMatchedProduct._id.toString();

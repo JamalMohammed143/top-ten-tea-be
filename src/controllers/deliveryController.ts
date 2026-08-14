@@ -107,19 +107,12 @@ export const createSale = async (
 
       const incentiveEarned = product.incentivePerPiece * quantity;
 
-      // Reduce from assignment
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date();
-      endOfDay.setHours(23, 59, 59, 999);
-
       // Hierarchical search for the most relevant assignment
       let assignment = await Assignment.findOne({
         deliveryPersonId,
         productId,
         storeId: finalStoreId,
         status: "active",
-        createdAt: { $gte: startOfDay, $lte: endOfDay },
       });
 
       if (!assignment && currentStore?.groupName) {
@@ -128,7 +121,6 @@ export const createSale = async (
           productId,
           groupNames: currentStore.groupName,
           status: "active",
-          createdAt: { $gte: startOfDay, $lte: endOfDay },
         });
       }
 
@@ -140,7 +132,6 @@ export const createSale = async (
           storeId: { $exists: false },
           groupNames: { $size: 0 },
           status: "active",
-          createdAt: { $gte: startOfDay, $lte: endOfDay },
         });
       }
 
