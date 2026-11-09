@@ -6,7 +6,8 @@
     "dev": "nodemon src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "seed": "ts-node src/seedAdmin.ts"
+    "seed": "ts-node src/seedAdmin.ts",
+    "test": "tsc && node --test dist/tests/**/*.test.js"
   },
   "license": "MIT",
   "dependencies": {

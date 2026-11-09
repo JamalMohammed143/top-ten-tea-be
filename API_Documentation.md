@@ -166,6 +166,18 @@ Base URL: `http://localhost:5000` (or your deployed domain)
 ```
 *Note: Backend automatically calculates `finalTotal`.*
 
+#### 5. Delete Settlement (Development Only)
+- **DELETE** `/admin/settlements/:id`
+- **Description:** Deletes a settlement record by ID. Permitted only in development mode (`NODE_ENV !== "production"`).
+- **Response:**
+```json
+{
+  "success": true,
+  "message": "Settlement deleted successfully",
+  "data": {}
+}
+```
+
 ---
 
 ## Delivery Flow (`/delivery`)

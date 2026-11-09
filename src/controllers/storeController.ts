@@ -94,49 +94,53 @@ export const getStores = async (
       query.name = { $regex: search as string, $options: "i" };
     }
 
-    // If delivery person, restrict their view to assigned groups/stores
+    // If delivery person, restrict their view to assigned groups/stores (unless they have a general assignment)
     if (req.user?.role === "delivery") {
       const assignments = await Assignment.find({
         deliveryPersonId: req.user._id,
         status: "active",
       });
 
-      const assignedGroupNames = new Set<string>();
-      assignments.forEach((a: any) => {
-        if (a.groupNames && Array.isArray(a.groupNames)) {
-          a.groupNames.forEach((gn: string) => assignedGroupNames.add(gn));
+      const hasGeneralAssignment = assignments.some(
+        (a: any) =>
+          !a.storeId &&
+          (!a.groupNames || !Array.isArray(a.groupNames) || a.groupNames.length === 0),
+      );
+
+      if (!hasGeneralAssignment) {
+        const assignedGroupNames = new Set<string>();
+        assignments.forEach((a: any) => {
+          if (a.groupNames && Array.isArray(a.groupNames)) {
+            a.groupNames.forEach((gn: string) => assignedGroupNames.add(gn));
+          }
+        });
+
+        const assignedStoreIds = assignments
+          .filter((a: any) => a.storeId)
+          .map((a: any) => a.storeId);
+
+        const assignedQuery = {
+          $or: [
+            { groupName: { $in: Array.from(assignedGroupNames) } },
+            { _id: { $in: assignedStoreIds } },
+          ],
+        };
+
+        const filters: any[] = [assignedQuery];
+
+        if (queryGroupNames.length > 0) {
+          filters.push({ groupName: { $in: queryGroupNames } });
         }
-      });
 
-      const assignedStoreIds = assignments
-        .filter((a: any) => a.storeId)
-        .map((a: any) => a.storeId);
+        if (queryAreaNames.length > 0) {
+          filters.push({ areaName: { $in: queryAreaNames } });
+        }
 
-      const assignedQuery = {
-        $or: [
-          { groupName: { $in: Array.from(assignedGroupNames) } },
-          { _id: { $in: assignedStoreIds } },
-        ],
-      };
+        if (search) {
+          filters.push({ name: { $regex: search as string, $options: "i" } });
+        }
 
-      const filters: any[] = [assignedQuery];
-
-      if (queryGroupNames.length > 0) {
-        filters.push({ groupName: { $in: queryGroupNames } });
-      }
-
-      if (queryAreaNames.length > 0) {
-        filters.push({ areaName: { $in: queryAreaNames } });
-      }
-
-      if (search) {
-        filters.push({ name: { $regex: search as string, $options: "i" } });
-      }
-
-      if (filters.length > 1) {
-        query = { $and: filters };
-      } else {
-        query = assignedQuery;
+        query = filters.length > 1 ? { $and: filters } : assignedQuery;
       }
     }
 
@@ -182,7 +186,7 @@ export const updateStore = async (
   try {
     const { id } = req.params;
     const store = await Store.findByIdAndUpdate(id, req.body, {
-      returnDocument: "after",
+      new: true,
       runValidators: true,
     });
     if (!store) return next(new AppError("Store not found", 404));

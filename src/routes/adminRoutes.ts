@@ -19,6 +19,7 @@ import {
   getSettlementDetails,
   getSettlements,
   createSettlement,
+  deleteSettlement,
   getProductSalesReport,
   getStoreSalesReport,
 } from "../controllers/adminController";
@@ -76,6 +77,7 @@ router.get("/tracking", getTracking);
 router.get("/tracking/settlement/:deliveryPersonId", getSettlementDetails);
 router.get("/settlements", getSettlements);
 router.post("/settlements", createSettlement);
+router.delete("/settlements/:id", deleteSettlement);
 router.get("/reports/product-sales", getProductSalesReport);
 router.get("/reports/store-sales", getStoreSalesReport);
 

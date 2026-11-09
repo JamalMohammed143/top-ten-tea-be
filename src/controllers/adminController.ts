@@ -201,20 +201,25 @@ export const createAssignment = async (
       }
 
       // Validate store if provided
-      if (storeId) {
-        const store = await Store.findById(storeId);
+      const validStoreId =
+        storeId && typeof storeId === "string" && storeId.trim() !== ""
+          ? storeId.trim()
+          : undefined;
+
+      if (validStoreId) {
+        const store = await Store.findById(validStoreId);
         if (!store) {
-          return next(new AppError(`Store not found: ${storeId}`, 404));
+          return next(new AppError(`Store not found: ${validStoreId}`, 404));
         }
       }
 
       const assignment = await Assignment.create({
         deliveryPersonId: userId,
         productId,
-        storeId,
-        groupNames,
-        assignedQuantity: quantity,
-        remainingQuantity: quantity,
+        storeId: validStoreId,
+        groupNames: Array.isArray(groupNames) ? groupNames : [],
+        assignedQuantity: Number(quantity) || 0,
+        remainingQuantity: Number(quantity) || 0,
       });
 
       createdAssignments.push(assignment);
@@ -517,9 +522,8 @@ export const createSettlement = async (
     endOfDay.setHours(23, 59, 59, 999);
 
     const petrolAmount = parseFloat(petrolAllowance) || 0;
-    // Payout Logic: Typically Delivery agent pays admin (Sales - Incentive + Petrol Allowance) or similar,
-    // Adjust logic based on exact business rule. Here finalTotal = totalSales - incentive - petrol
-    const finalTotal = totalSalesAmount - totalIncentive - petrolAmount;
+    const salesAmount = parseFloat(totalSalesAmount) || 0;
+    const incentiveAmount = parseFloat(totalIncentive) || 0;
 
     // Fetch data for the new metadata fields BEFORE deleting records
     const assignments = await Assignment.find({
@@ -566,9 +570,9 @@ export const createSettlement = async (
         groupedBillsMap.set(bId, {
           billId: bId,
           storeName: sale.storeId?.name || "Unknown Store",
-          groupName: sale.storeId?.groupName || "Unknown Store",
-          areaName: sale.storeId?.areaName || "Unknown Store",
-          storeId: sale.storeId?._id || "Unknown Store",
+          groupName: sale.storeId?.groupName || "Unknown Group",
+          areaName: sale.storeId?.areaName || "Unknown Area",
+          storeId: sale.storeId?._id || null,
           createdAt: sale.createdAt,
           totalAmount: 0,
           totalIncentive: 0,
@@ -613,11 +617,14 @@ export const createSettlement = async (
 
     console.log("unvisitedStores", unvisitedStores);
 
+    // Payout Logic: Delivery agent pays admin Total Amount to be Collected = (Sales - Online Payments - Incentive - Petrol Allowance)
+    const finalTotal = salesAmount - totalOnlineAmount - incentiveAmount - petrolAmount;
+
     const settlement = await Settlement.create({
       deliveryPersonId,
       date: targetDate,
-      totalSalesAmount,
-      totalIncentive,
+      totalSalesAmount: salesAmount,
+      totalIncentive: incentiveAmount,
       petrolAllowance: petrolAmount,
       finalTotal,
       billList,
@@ -748,6 +755,36 @@ export const getSettlements = async (
     );
 
     res.status(200).json({ success: true, data: enriched });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteSettlement = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    if (process.env.NODE_ENV === "production") {
+      return next(
+        new AppError(
+          "Deleting settlements is only allowed in development environment",
+          403,
+        ),
+      );
+    }
+
+    const settlement = await Settlement.findByIdAndDelete(req.params.id);
+    if (!settlement) {
+      return next(new AppError("Settlement not found", 404));
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Settlement deleted successfully",
+      data: {},
+    });
   } catch (error) {
     next(error);
   }

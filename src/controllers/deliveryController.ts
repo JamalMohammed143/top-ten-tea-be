@@ -72,6 +72,9 @@ export const createSale = async (
           storeId: generatedId,
           address,
           contactNo,
+          groupName: (req.body.groupName && req.body.groupName.trim()) || "General",
+          areaName: (req.body.areaName && req.body.areaName.trim()) || "General",
+          message: (req.body.message && req.body.message.trim()) || "Created by delivery person",
         });
       }
       finalStoreId = store._id;
@@ -88,6 +91,19 @@ export const createSale = async (
       return next(new AppError("At least one product item is required", 400));
     }
 
+    // Pre-validate all products before modifying any stock or creating sales
+    const productsMap = new Map();
+    for (const item of items) {
+      if (!item.productId) {
+        return next(new AppError("Product ID is required for each item", 400));
+      }
+      const product = await Product.findById(item.productId);
+      if (!product) {
+        return next(new AppError(`Product not found: ${item.productId}`, 404));
+      }
+      productsMap.set(item.productId.toString(), product);
+    }
+
     const createdSales = [];
 
     // Generate a unique billId for this submission
@@ -96,43 +112,70 @@ export const createSale = async (
     // Process each item
     for (const item of items) {
       const { productId, quantity, amount, pricePerUnit } = item;
-      console.log(productId, quantity, amount, pricePerUnit);
-      // Get product to calculate commission
-      const product = await Product.findById(productId);
-      if (!product) {
-        // Option: skip or return error for the whole request.
-        // Given typically these are atomic, let's return error if any product is missing.
-        return next(new AppError(`Product not found: ${productId}`, 404));
-      }
-
+      const product = productsMap.get(productId.toString());
       const incentiveEarned = product.incentivePerPiece * quantity;
 
       // Hierarchical search for the most relevant assignment
+      // 1. Store-specific assignment
       let assignment = await Assignment.findOne({
         deliveryPersonId,
         productId,
         storeId: finalStoreId,
+        remainingQuantity: { $gt: 0 },
         status: "active",
       });
+      if (!assignment) {
+        assignment = await Assignment.findOne({
+          deliveryPersonId,
+          productId,
+          storeId: finalStoreId,
+          status: "active",
+        });
+      }
 
+      // 2. Group-specific assignment
       if (!assignment && currentStore?.groupName) {
         assignment = await Assignment.findOne({
           deliveryPersonId,
           productId,
           groupNames: currentStore.groupName,
+          remainingQuantity: { $gt: 0 },
           status: "active",
         });
+        if (!assignment) {
+          assignment = await Assignment.findOne({
+            deliveryPersonId,
+            productId,
+            groupNames: currentStore.groupName,
+            status: "active",
+          });
+        }
       }
 
+      // 3. General assignment (no specific store or group)
       if (!assignment) {
-        // General assignment (no specific store or group)
-        assignment = await Assignment.findOne({
+        const generalQuery = {
           deliveryPersonId,
           productId,
-          storeId: { $exists: false },
-          groupNames: { $size: 0 },
+          $and: [
+            { $or: [{ storeId: { $exists: false } }, { storeId: null }] },
+            {
+              $or: [
+                { groupNames: { $size: 0 } },
+                { groupNames: { $exists: false } },
+                { groupNames: null },
+              ],
+            },
+          ],
           status: "active",
+        };
+        assignment = await Assignment.findOne({
+          ...generalQuery,
+          remainingQuantity: { $gt: 0 },
         });
+        if (!assignment) {
+          assignment = await Assignment.findOne(generalQuery);
+        }
       }
 
       if (assignment) {
